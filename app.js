@@ -1718,9 +1718,11 @@ Reply with only JSON in exactly this shape:
       Object.values(S.mems).forEach(m => { if (m.folder === editId && m.dest === old) { m.dest = name; saveMem(m); } });
       S.folder = name;
     } else { FOLDERS().push({ id: rid('f-'), ...rec }); S.folder = name; }
-    persist('prefs'); $('#modal').innerHTML = ''; REEL.sig = '';
+    persist('prefs'); REEL.sig = '';
     if (S.tab !== 'mem') setTab('mem');
-    openFolder(name);
+    renderMem();
+    const t = reelTrips().find(x => x.folder && x.folder.name === name);
+    if (t) openTripGallery(t); else $('#modal').innerHTML = '';
     if (!editId) setTimeout(() => pickFiles(name), 350);
   });
 
@@ -1922,7 +1924,7 @@ Reply with only a JSON array with one object per photo in the same order:
         await Promise.all(batch.map(upload));
         await classify(batch);
         for (const q of batch) { S.mems[q.id] = q.rec; await saveMem(q.rec); }
-        renderMem();
+        renderMem(); refreshGallery();
       }
     } finally { busyUpload = false; }
     const n = S.queue.filter(x => x.rec).length;
@@ -2126,7 +2128,7 @@ Reply with only a JSON array with one object per photo in the same order:
     if (!REEL.year) REEL.year = trips[0] ? trips[0].from.slice(0, 4) : now;
     const sig = trips.map(t => (t.folder ? t.folder.id + ':' + (t.folder.cover || '') + t.from + t.to : '') + t.items.map(m => m.id).join('.')).join(',') + '|' + years.join(',');
     if (!force && sig === REEL.sig) return;
-    REEL.sig = sig; REEL.trips = trips; REEL.years = years; REEL.cur = -1; REEL.ym = null; REEL.calBuilt = false;
+    REEL.sig = sig; REEL.trips = trips; REEL.years = years; REEL.cur = -1; REEL.shown = null; REEL.ym = null; REEL.calBuilt = false;
     const N = trips.length, rev = trips.slice().reverse();
     $('#reel').style.height = `calc(100vh + ${Math.max(0, N - 1) * STEP + 80}px)`;
     $('#reel').classList.toggle('empty', !N);
@@ -2306,6 +2308,7 @@ Reply with only a JSON array with one object per photo in the same order:
   });
   const GAL_N = 20;
   function galleryPool(t) {
+    if (t.folder) return realMems().filter(m => m.folder === t.folder.id && memSrc(m)).sort((x, y) => (x.date || '').localeCompare(y.date || ''));
     const own = t.items.slice();
     if (!t.items.some(m => m.example)) return own;
     const seen = new Set(own.map(memSrc)), pool = own.slice();
@@ -2319,9 +2322,9 @@ Reply with only a JSON array with one object per photo in the same order:
     const items = galleryPool(t);
     const SH = ['big', 'tall', 'sq', 'wide', 'sq', 'tall', 'sq', 'wide', 'tall', 'sq', 'big', 'sq', 'wide', 'tall', 'sq', 'sq', 'wide', 'tall', 'sq', 'wide'];
     $('#modal').innerHTML = `<div class="modal" data-tg="close" role="dialog" aria-modal="true" aria-label="Memories from ${esc(t.key)}"><div class="tgal glass-x">
-      <div class="tg-head"><div><h3>${esc(t.key)}${t.city ? `<em>${esc(t.city)}</em>` : ''}</h3><p>${items.length} memories</p></div>
-      <button class="icon-btn close" data-tg="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button></div>
-      <div class="tg-scroll"><div class="mosaic tg-mosaic" id="tgMosaic">${items.map((m, k) => { const sh = SH[k % SH.length]; return `<button class="mz ${sh}" data-shape="${sh}" data-tg="open" data-id="${esc(m.id)}" aria-label="${esc(m.place || m.city || placeOf(m))}"><img src="${esc(memSrc(m))}" alt="" loading="lazy" draggable="false"><span class="pv-cap">${esc(m.place || m.city || placeOf(m))}</span></button>`; }).join('')}</div></div></div></div>`;
+      <div class="tg-head"><div><h3>${esc(t.folder ? t.folder.name : t.key)}${t.city ? `<em>${esc(t.city)}</em>` : ''}</h3><p>${items.length} ${items.length === 1 ? 'memory' : 'memories'}${t.folder && t.folder.start ? ' · ' + esc(fmtRange(t.folder.start, t.folder.end)) : ''}</p></div>
+      <div class="tg-acts">${t.folder ? `<button class="btn btn-sm tg-btn" data-tg="upload"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Add photos & videos</button><button class="btn btn-sm tg-btn tg-alt" data-tg="edit">Edit trip</button>` : ''}<button class="icon-btn close" data-tg="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button></div></div>
+      <div class="tg-scroll"><div class="mosaic tg-mosaic" id="tgMosaic">${t.folder ? `<button class="mz upl" data-shape="sq" data-tg="upload"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Add photos & videos</b><small>Select loads at once, drop them here, or paste</small></button>` : ''}${items.map((m, k) => { const sh = SH[k % SH.length]; return `<button class="mz ${sh}" data-shape="${sh}" data-tg="open" data-id="${esc(m.id)}" aria-label="${esc(m.place || m.city || placeOf(m))}"><img src="${esc(memSrc(m))}" alt="" loading="lazy" draggable="false"><span class="pv-cap">${esc(m.place || m.city || placeOf(m))}</span></button>`; }).join('')}</div></div></div></div>`;
     const box = $('#tgMosaic');
     requestAnimationFrame(() => { layoutMosaic(box); mro.observe(box); });
   }
@@ -2329,7 +2332,13 @@ Reply with only a JSON array with one object per photo in the same order:
     const b = ev.target.closest('[data-tg]'); if (!b) return;
     if (b.dataset.tg === 'close') { if (b.classList.contains('modal') && ev.target !== b) return; REEL.gal = null; $('#modal').innerHTML = ''; }
     if (b.dataset.tg === 'open') openLightbox(b.dataset.id);
+    if (b.dataset.tg === 'upload' && REEL.gal && REEL.gal.folder) pickFiles(REEL.gal.folder.name);
+    if (b.dataset.tg === 'edit' && REEL.gal && REEL.gal.folder) { const fd = REEL.gal.folder; REEL.gal = null; openFolderDialog(fd); }
   });
+  function refreshGallery() {
+    if (!REEL.gal || !REEL.gal.folder || !$('#tgMosaic')) return;
+    const t = reelTrips().find(x => x.folder && x.folder.id === REEL.gal.folder.id); if (t) openTripGallery(t);
+  }
   $('#reel').addEventListener('click', ev => {
     const b = ev.target.closest('[data-reel]'); if (!b || b.disabled) return;
     const a = b.dataset.reel;
@@ -2339,7 +2348,7 @@ Reply with only a JSON array with one object per photo in the same order:
     }
     if (a === 'day') reelScrollTo(+b.dataset.trip);
     if (a === 'month' && b.dataset.v) { const i = REEL.trips.findIndex(tr => tr.items.some(m => m.date.startsWith(b.dataset.v))); if (i >= 0) reelScrollTo(i); }
-    const openT = t => { if (!t) return; if (t.folder) { openFolder(t.folder.name); return; } openTripGallery(t); };
+    const openT = t => { if (t) openTripGallery(t); };
     if (a === 'frame') openT(REEL.trips[+b.dataset.i]);
     if (a === 'cam') { if (REEL.trips[REEL.cur]) openT(REEL.trips[REEL.cur]); else openFolderDialog(); }
     if (a === 'addtrip') openFolderDialog();

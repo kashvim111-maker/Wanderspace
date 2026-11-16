@@ -1257,6 +1257,13 @@ body{font-synthesis-weight:none}
 .fdlg .form input:focus{outline:2px solid #6e5a9e;outline-offset:1px}
 .fdlg .form label{display:grid;gap:6px;font-size:12px;font-weight:600;color:var(--ink-2)}
 .fdlg .form{display:grid;gap:12px}
+
+.tg-acts{display:flex;align-items:center;gap:8px}
+.tg-btn{display:inline-flex;align-items:center;gap:7px;background:#fff;color:#2a2438;border:0}
+.tg-btn.tg-alt{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.45)}
+.tg-mosaic .mz.upl{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.5);color:#fff}
+.tg-mosaic .mz.upl small{color:rgba(255,255,255,.8)}
+.tg-mosaic .mz.upl .ic{background:rgba(255,255,255,.25);color:#fff}
 </style>
 </head>
 <body>
@@ -1332,7 +1339,7 @@ body{font-synthesis-weight:none}
         </div>
       </div>
     </section>
-    <div class="mbody" id="mbody">
+    <div class="mbody" id="mbody" hidden>
       <section class="msec reveal" id="monthSec" aria-label="Your month in memories">
         <div class="msec-bg" id="calBg"></div>
         <div class="mcal glass-x" id="mcal" data-glare></div>
