@@ -26,7 +26,7 @@
 
   /* ---------- state ---------- */
   const S = {
-    trips: clone(SEED.trips), els: clone(SEED.els), mems: {}, prefs: { hideExamples: false },
+    trips: {}, els: [], mems: {}, prefs: { hideExamples: true },
     view: { x: 0, y: 0, z: 1 }, sel: null, tab: 'dream', folder: null, city: 'all', queue: [], cat: 'all',
   };
   const caps = { db: null, assets: null, sample: null, col: null, ready: false };
@@ -102,12 +102,15 @@
   }
   async function deleteMem(id) { delete S.mems[id]; if (caps.col) try { await caps.col.doc(id).delete(); } catch (e) { /* ignore */ } }
 
+  const SEED_EL_IDS = new Set((SEED.els || []).map(e => e.id)), SEED_TRIP_IDS = new Set(Object.keys(SEED.trips || {}));
+  function stripSeedEls(els) { const out = els.filter(e => !SEED_EL_IDS.has(e.id) && !(e.kind === 'trip' && SEED_TRIP_IDS.has(e.tripId))); if (out.length !== els.length) persist('board', 1500); return out; }
+  function stripSeedTrips(trips) { let n = 0; SEED_TRIP_IDS.forEach(id => { if (trips[id]) { delete trips[id]; n++; } }); if (n) persist('trips', 1500); return trips; }
   function loadLocal() {
     try {
       const raw = localStorage.getItem('wander-passport-v1');
       if (!raw) return;
       const d = JSON.parse(raw);
-      if (d.els && d.trips) { S.els = d.els; S.trips = d.trips; S.prefs = d.prefs || S.prefs; }
+      if (d.els && d.trips) { S.els = stripSeedEls(d.els); S.trips = stripSeedTrips(d.trips); S.prefs = d.prefs || S.prefs; }
     } catch (e) { /* ignore */ }
   }
 
@@ -130,8 +133,8 @@
       let changedBoard = false;
       snap.docs.forEach(d => {
         const data = d.data(); if (!data) return;
-        if (d.id === 'board') { if (!W.dirty.board && !W.writing.board && !op) { S.els = clone(data.els || []); boardFromStore = true; changedBoard = true; } }
-        else if (d.id === 'trips') { if (!W.dirty.trips && !W.writing.trips) { S.trips = clone(data.trips || {}); changedBoard = true; } }
+        if (d.id === 'board') { if (!W.dirty.board && !W.writing.board && !op) { S.els = stripSeedEls(clone(data.els || [])); boardFromStore = true; changedBoard = true; } }
+        else if (d.id === 'trips') { if (!W.dirty.trips && !W.writing.trips) { S.trips = stripSeedTrips(clone(data.trips || {})); changedBoard = true; } }
         else if (d.id === 'prefs') { const { v, ...p } = data; S.prefs = { ...S.prefs, ...p }; }
         else if (d.id.startsWith('m-')) mems[d.id] = clone(data);
       });
@@ -185,6 +188,7 @@
 
   function renderWorld() {
     world.innerHTML = DECOR + S.els.map(elHTML).join('');
+    const be = $('#boardEmpty'); if (be) be.hidden = S.els.length > 0;
     positionSeltool();
     renderCounts();
   }
@@ -471,6 +475,7 @@
   $('#cats').addEventListener('click', ev => { const b = ev.target.closest('.cat'); if (!b) return; S.cat = b.dataset.cat; renderTray(); });
   $('#trayToggle').onclick = () => { const t = $('#tray'); t.classList.toggle('collapsed'); $('#trayToggle').style.transform = t.classList.contains('collapsed') ? 'rotate(180deg)' : ''; };
   $('#trayAddDest').onclick = () => openAddDest({});
+  $('#beAdd').onclick = () => openAddDest({});
 
   function addFromTray(what, wx, wy) {
     let e;
@@ -1150,14 +1155,14 @@ Reply with only JSON in exactly this shape:
   const COVER_SCENES = ['kyoto', 'santorini', 'iceland', 'bali', 'paris', 'ladakh', 'jaipur', 'vietnam', 'goa'];
   function openAddDest(opts) {
     hidePP(); IT.id = null;
-    Object.assign(AD, { name: '', country: '', days: 5, target: '', art: 'generic', img: opts.img || null, blob: opts.blob || null, fromEl: opts.fromEl || null, draft: true, busy: false, guess: '', more: opts.more || [], at: opts.at || null, fromPhoto: !!opts.fromPhoto, mode: 'type', ll: null });
+    Object.assign(AD, { name: '', country: '', days: 5, target: '', art: 'generic', img: opts.img || null, blob: opts.blob || null, fromEl: opts.fromEl || null, draft: true, busy: false, guess: '', more: opts.more || [], at: opts.at || null, fromPhoto: opts.fromPhoto !== false, mode: 'type', ll: null });
     if (AD.fromPhoto || AD.fromEl) AD.days = 4;
     MV.vb = [0, 40, 1000, 420];
     renderAddDest();
     setTimeout(() => $('#adForm input[name=name]')?.focus(), 60);
   }
   function renderAddDest() {
-    if ((AD.fromPhoto || AD.fromEl) && AD.img) return renderNamePhoto();
+    if (AD.fromPhoto || AD.fromEl) return renderNamePhoto();
     $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Add a destination"><div class="dialog">
       <button class="icon-btn close" data-ad="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
       <h3>${AD.fromEl || AD.fromPhoto ? 'Name this destination' : 'Add a destination'}</h3><p class="lead">${AD.fromEl || AD.fromPhoto ? 'Your photo becomes its postcard, with its own passport and itinerary.' : 'It goes on your board as a postcard with its own passport and itinerary.'}</p>
@@ -1220,23 +1225,38 @@ Reply with only JSON in exactly this shape:
     AD.mode = AD.mode || 'type';
     $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Where is this?"><div class="dialog npop">
       <button class="icon-btn close" data-ad="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
-      <div class="np-media"><img src="${esc(AD.img)}" alt="The photo you added">
-        ${claudeReady() ? `<button type="button" class="np-ask" data-ad="where" ${AD.busy ? 'disabled' : ''}>${AD.busy ? '<span class="spin"></span>Looking…' : '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.7z" fill="currentColor"/></svg>Ask Claude where this is'}</button>` : ''}</div>
+      <div class="np-media${AD.img ? '' : ' empty'}" id="npMedia">${AD.img ? `<img src="${esc(AD.img)}" alt="The photo you added"><button type="button" class="np-swap" data-ad="upload">Change photo</button>` : `<button type="button" class="np-drop" data-ad="upload"><span class="np-dico"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.8" fill="currentColor"/><path d="M4 17l5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><b>Add a photo of this place</b><small>Click to choose, drop it here, or paste</small></button>`}
+        ${AD.img && claudeReady() ? `<button type="button" class="np-ask" data-ad="where" ${AD.busy ? 'disabled' : ''}>${AD.busy ? '<span class="spin"></span>Looking…' : '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.7z" fill="currentColor"/></svg>Ask Claude where this is'}</button>` : ''}</div>
       <form class="form np-form" id="adForm" autocomplete="off">
-        <div><h3>Where is this?</h3><p class="lead">Name the place and we’ll plan every day, map the route, pick places to visit, write your checklist and precautions — then stamp its passport.</p></div>
+        <div><h3>${AD.img ? 'Where is this?' : 'Add a destination'}</h3><p class="lead">Name the place and we’ll plan every day, map the route, pick places to visit, write your checklist and precautions — then stamp its passport.</p></div>
         ${AD.guess ? `<p class="np-guess">${esc(AD.guess)}</p>` : ''}
         <div class="np-toggle" role="tablist" aria-label="How to choose the place"><span class="ind" style="transform:translateX(${AD.mode === 'map' ? 100 : 0}%)"></span><button type="button" role="tab" data-ad="mode" data-v="type" aria-selected="${AD.mode === 'type'}">Type the place</button><button type="button" role="tab" data-ad="mode" data-v="map" aria-selected="${AD.mode === 'map'}">Pick on map</button></div>
         <div class="np-name" ${AD.mode === 'map' ? 'hidden' : ''}><label>Destination<input type="text" name="name" required value="${esc(AD.name)}" placeholder="e.g. Lisbon, Sikkim, Hội An"></label><div class="np-sugg" id="npSugg" role="listbox" hidden></div></div>
         <div class="np-mapwrap ${AD.mode === 'map' ? 'live' : ''}"><div class="np-map" id="npMap">${MAPSVG()}</div>
           <div class="np-maptools">${AD.mode === 'map' ? '<button type="button" data-ad="zin" aria-label="Zoom in">+</button><button type="button" data-ad="zout" aria-label="Zoom out">−</button>' : ''}<span class="np-picked" id="npPicked">${AD.mode === 'map' ? (AD.name ? `📍 ${esc(AD.name)}${AD.country ? ', ' + esc(AD.country) : ''}` : 'Click anywhere to drop a pin · scroll to zoom · drag to move') : (AD.ll ? `📍 ${esc(AD.name)}` : 'The map follows what you type')}</span></div></div>
         <div class="row" style="grid-template-columns:1.6fr 1fr"><label>Country<input type="text" name="country" value="${esc(AD.country)}" placeholder="Portugal"></label><label>Number of days<input type="number" name="days" min="1" max="30" value="${AD.days}" required></label></div>
+        <p class="np-note">We plan up to the first 5 days for you — any extra days are yours to fill in the planner.</p>
         <div class="actions"><button type="button" class="btn btn-ghost" data-ad="close">Cancel</button><button class="btn btn-dark np-go"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.7z" fill="currentColor"/></svg>Plan my trip</button></div>
       </form></div></div>`;
     if (AD.mode === 'map' && AD.name) { const f = $('#adForm'); if (!f.querySelector('input[type=hidden][name=name]')) f.insertAdjacentHTML('beforeend', `<input type="hidden" name="name" value="${esc(AD.name)}">`); }
     const keepVB = MV.vb.slice(); setVB(AD.ll ? keepVB : [0, 40, 1000, 420], false);
     if (AD.ll) placePin(AD.ll, MV.vb[2] > 600);
-    wireNameMap();
+    wireNameMap(); wireNpMedia();
   }
+  function wireNpMedia() {
+    const m = $('#npMedia'); if (!m) return;
+    m.addEventListener('dragover', ev => { ev.preventDefault(); m.classList.add('over'); });
+    m.addEventListener('dragleave', () => m.classList.remove('over'));
+    m.addEventListener('drop', async ev => { ev.preventDefault(); ev.stopPropagation(); m.classList.remove('over'); const f = Array.from(ev.dataTransfer.files || []).find(x => x.type.startsWith('image/')); if (f) setNpPhoto(f); });
+  }
+  async function setNpPhoto(f) {
+    syncAD(); const blob = await downscale(f, 1400); if (!blob) return toast('That image can’t be shown in this browser.');
+    AD.blob = blob; AD.img = URL.createObjectURL(blob); renderAddDest();
+  }
+  document.addEventListener('paste', ev => {
+    if (!$('#npMedia') || ev.target.closest?.('input,textarea')) return;
+    const f = Array.from(ev.clipboardData?.files || []).find(x => x.type.startsWith('image/')); if (f) { ev.preventDefault(); ev.stopImmediatePropagation(); setNpPhoto(f); }
+  }, true);
   function wireNameMap() {
     const map = $('#npMap'), svg = map && map.querySelector('svg'); if (!svg) return;
     const toSvg = (cx, cy) => { const r = svg.getBoundingClientRect(), vb = MV.vb; const s = Math.max(vb[2] / r.width, vb[3] / r.height); const ox = (r.width * s - vb[2]) / 2, oy = (r.height * s - vb[3]) / 2; return [vb[0] + (cx - r.left) * s - ox, vb[1] + (cy - r.top) * s - oy]; };
@@ -1286,7 +1306,7 @@ Reply with only JSON in exactly this shape:
 
   /* planning: Claude when available, a starter plan otherwise */
   function planPrompt(t) {
-    return `Plan a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.ll ? ` (around ${t.ll[0].toFixed(2)}, ${t.ll[1].toFixed(2)})` : ''}. The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.
+    return `Plan the first ${Math.min(t.days, 5)} days of a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.ll ? ` (around ${t.ll[0].toFixed(2)}, ${t.ll[1].toFixed(2)})` : ''}. The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.
 Use real, currently operating places only — specific named cafés, restaurants, temples, museums, viewpoints, nature spots and experiences. Group each day geographically so it is walkable or a short ride.
 Reply with only JSON in exactly this shape:
 {"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","tagline":"max 12 words, evocative",
@@ -1294,10 +1314,10 @@ Reply with only JSON in exactly this shape:
 "places":[{"cat":"cafe|eat|temple|see|nature|do|stay","name":"","area":"neighbourhood or town","note":"max 8 words"}],
 "checklist":["short pre-trip task, e.g. visa, permits, bookings"],
 "precautions":["short safety, health, weather, altitude, scam or etiquette precaution specific to this place"]}
-"temple" covers temples, shrines, churches and museums. "lat"/"lon" are the approximate centre of that day's area. "go" and "mins" say how to reach each stop from the previous one (the first stop: from where they stay). Give exactly ${t.days} days with 4–6 items each, 14–22 places covering every category, 4–7 checklist items and 4–6 precautions.`;
+"temple" covers temples, shrines, churches and museums. "lat"/"lon" are the approximate centre of that day's area. "go" and "mins" say how to reach each stop from the previous one (the first stop: from where they stay). Give exactly ${Math.min(t.days, 5)} days with 4–6 items each, 14–22 places covering every category, 4–7 checklist items and 4–6 precautions.`;
   }
   function starterPlan(t) {
-    const ll = t.ll || [20, 78], n = t.days, j = i => [ll[0] + Math.sin(i * 1.7) * 0.03 * (i + 1), ll[1] + Math.cos(i * 1.3) * 0.04 * (i + 1)];
+    const ll = t.ll || [20, 78], n = Math.min(t.days, 5), j = i => [ll[0] + Math.sin(i * 1.7) * 0.03 * (i + 1), ll[1] + Math.cos(i * 1.3) * 0.04 * (i + 1)];
     const THEMES = [['Arrive & settle in', [['Check in & freshen up', 'stay', 'car'], ['Neighbourhood walk', 'see', 'walk'], ['Local café', 'cafe', 'walk'], ['Sunset viewpoint', 'nature', 'car'], ['Welcome dinner', 'eat', 'walk']]],
       ['Old town & heritage', [['Historic centre', 'see', 'walk'], ['Main temple or museum', 'temple', 'walk'], ['Market lunch', 'eat', 'walk'], ['Artisan lanes', 'do', 'walk'], ['Rooftop dinner', 'eat', 'car']]],
       ['Nature day out', [['Early start to the hills', 'nature', 'car'], ['Scenic trail', 'nature', 'walk'], ['Picnic lunch', 'eat', 'walk'], ['Waterfall or lake', 'nature', 'car'], ['Slow evening', 'cafe', 'car']]],
@@ -1323,6 +1343,38 @@ Reply with only JSON in exactly this shape:
     Object.assign(t, starterPlan(t)); t.starter = true;
     return false;
   }
+  function finishPlan(t) {
+    t.itinerary = (t.itinerary || []).slice(0, 5);
+    for (let i = t.itinerary.length; i < t.days; i++) t.itinerary.push({ title: `Day ${i + 1} — your plan`, ll: null, items: [], own: true });
+    const have = new Set((t.places || []).map(p => p.name.toLowerCase()));
+    t.places = t.places || [];
+    t.itinerary.forEach((d, i) => d.items.forEach(it => { if (it.cat !== 'stay' && !have.has(it.name.toLowerCase())) { have.add(it.name.toLowerCase()); t.places.push({ cat: it.cat, name: it.name, area: d.title, note: `On day ${i + 1}`, done: false }); } }));
+    findImages(t);
+  }
+  /* photos for every stop and place: Wikipedia's free image search (works on the hosted site; blocked inside Claude artifacts) */
+  const wikiCache = new Map();
+  async function wikiImage(q) {
+    if (wikiCache.has(q)) return wikiCache.get(q);
+    const p = (async () => {
+      try {
+        const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=1&prop=pageimages&piprop=thumbnail&pithumbsize=800`;
+        const r = await fetch(u); if (!r.ok) return null;
+        const d = await r.json(); const pg = d.query && Object.values(d.query.pages || {})[0];
+        return (pg && pg.thumbnail && pg.thumbnail.source) || null;
+      } catch (e) { return null; }
+    })();
+    wikiCache.set(q, p); return p;
+  }
+  async function findImages(t) {
+    const jobs = [];
+    (t.itinerary || []).forEach(d => d.items.forEach(it => { if (!it.img && it.cat !== 'stay') jobs.push(async () => { const im = await wikiImage(`${it.name} ${t.name}`); if (im) it.img = im; }); }));
+    (t.places || []).forEach(p => { if (!p.img) jobs.push(async () => { const im = await wikiImage(`${p.name} ${t.name}`); if (im) p.img = im; }); });
+    let k = 0, found = 0;
+    const worker = async () => { while (k < jobs.length) { const j = jobs[k++]; await j(); } };
+    await Promise.all(Array.from({ length: 4 }, worker));
+    (t.places || []).forEach(p => { if (!p.img) { const im = placeImg(t, p); if (im) p.img = im; } if (p.img) found++; });
+    if (found) { tripChanged(t); persist('trips'); if (IT.id === t.id && IT.mode === 'plan') renderItin(); }
+  }
   const PLAN_STEPS = n => [`Finding ${n} on the map`, 'Planning each day', 'Drawing the route between stops', 'Picking places to visit', 'Writing your checklist & precautions', 'Stamping your passport'];
   function renderPlanning(t, done = 0) {
     const box = $('.np-form'); if (!box) return;
@@ -1344,6 +1396,7 @@ Reply with only JSON in exactly this shape:
     renderPlanning(t, 0);
     let step = 0; const timer = setInterval(() => { if (step < 4) renderPlanning(t, ++step); }, 1100);
     const ai = await planTrip(t);
+    finishPlan(t);
     clearInterval(timer);
     for (let s = step + 1; s <= 6; s++) { renderPlanning(t, s); await new Promise(r => setTimeout(r, 450)); }
     tripChanged(t); persist('trips'); renderWorld(); select(S.els.find(e => e.tripId === id)?.id || null);
@@ -1392,7 +1445,7 @@ Reply with only JSON in exactly this shape:
   $('#modal').addEventListener('submit', async ev => {
     if (ev.target.id !== 'adForm') return;
     ev.preventDefault();
-    if ((AD.fromPhoto || AD.fromEl) && AD.img) return submitNamePhoto();
+    if (AD.fromPhoto || AD.fromEl) return submitNamePhoto();
     syncAD();
     if (!AD.name.trim()) return;
     const id = rid('t');
@@ -1431,7 +1484,7 @@ Reply with only JSON in exactly this shape:
      MEMORIES
      ================================================================ */
   const realMems = () => Object.values(S.mems);
-  const showingExamples = () => !realMems().length && !S.prefs.hideExamples;
+  const showingExamples = () => false;
   const allMems = () => (showingExamples() ? SEED.examples : realMems());
 
   const FOLDERS = () => (S.prefs.folders = S.prefs.folders || []);
@@ -1512,7 +1565,7 @@ Reply with only JSON in exactly this shape:
     $('#monthSec').hidden = true;
     if (S.folder) return renderDetail();
     $('#detailSec').hidden = true; $('#folderSec').hidden = false;
-    const tileImg = f => { const m = f.items.find(x => x.photo || x.thumb || (x.type === 'image' && x.url)); if (m) return m.photo || m.thumb || m.url; const tr = f.trip && S.trips[f.trip]; return tr ? coverSrc(tr) : null; };
+    const tileImg = f => { if (f.meta && f.meta.cover) return f.meta.cover; const m = f.items.find(x => x.photo || x.thumb || (x.type === 'image' && x.url)); if (m) return m.photo || m.thumb || m.url; const tr = f.trip && S.trips[f.trip]; return tr ? coverSrc(tr) : null; };
     const SH = ['big', 'tall', 'sq', 'wide', 'sq', 'tall', 'sq', 'wide', 'tall', 'sq'];
     const qq = q();
     const shown = folders.filter(f => !qq || [f.key, ...f.cities.keys(), ...f.items.map(memText)].join(' ').toLowerCase().includes(qq));
@@ -1613,24 +1666,34 @@ Reply with only JSON in exactly this shape:
   const dirInput = Object.assign(document.body.appendChild(document.createElement('input')), { type: 'file', multiple: true, hidden: true });
   dirInput.setAttribute('webkitdirectory', ''); dirInput.setAttribute('directory', '');
   dirInput.addEventListener('change', () => { const d = upDest; upDest = null; processFiles(dirInput.files, d); dirInput.value = ''; });
+  const FDT = { blob: null, url: null };
+  const thumbInput = Object.assign(document.body.appendChild(document.createElement('input')), { type: 'file', accept: 'image/*', hidden: true });
+  thumbInput.addEventListener('change', async () => {
+    const f = thumbInput.files[0]; thumbInput.value = ''; if (!f) return;
+    const blob = await downscale(f, 1400); if (!blob) return toast('That image can’t be shown in this browser.');
+    FDT.blob = blob; FDT.url = URL.createObjectURL(blob);
+    const th = $('.fd-th'); if (th) th.innerHTML = `<img src="${FDT.url}" alt="">`;
+  });
   function openFolderDialog(edit) {
     const fd = edit || { name: '', place: '', country: '', start: '', end: '' };
     $('#modal').innerHTML = `<div class="modal" data-fd="close" role="dialog" aria-modal="true" aria-label="${edit ? 'Edit trip folder' : 'New trip folder'}"><div class="dialog fdlg">
       <button class="icon-btn close" data-fd="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
       <h3>${edit ? 'Edit trip' : 'New trip folder'}</h3><p class="lead">One folder per trip. Drop in as many photos and videos as you like — they stay together and show up in your reel.</p>
       <form class="form" id="fdForm" autocomplete="off">
+        <div class="fd-thumb"><button type="button" class="fd-th" data-fd="thumb" aria-label="Choose a thumbnail">${fd.cover ? `<img src="${esc(fd.cover)}" alt="">` : '<span><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Thumbnail</span>'}</button><div><b>Trip thumbnail</b><small>The photo that shows for this trip in your reel. You can add all the other photos next.</small></div></div>
         <label>Trip name<input name="name" required maxlength="60" value="${esc(fd.name)}" placeholder="e.g. Japan in spring, Goa with the girls"></label>
         <div class="row" style="grid-template-columns:1.3fr 1fr"><label>Place<input name="place" value="${esc(fd.place)}" placeholder="Kyoto"></label><label>Country<input name="country" value="${esc(fd.country)}" placeholder="Japan"></label></div>
-        <div class="row" style="grid-template-columns:1fr 1fr"><label>From<input type="date" name="start" value="${esc(fd.start || '')}"></label><label>To<input type="date" name="end" value="${esc(fd.end || '')}"></label></div>
+        <div class="row" style="grid-template-columns:1fr 1fr"><label>From<input type="date" name="start" required value="${esc(fd.start || '')}"></label><label>To<input type="date" name="end" value="${esc(fd.end || '')}"></label></div>
         <div class="actions">${edit ? '<button type="button" class="btn btn-ghost fd-del" data-fd="del">Delete folder</button><span style="flex:1"></span>' : ''}<button type="button" class="btn btn-ghost" data-fd="close">Cancel</button><button class="btn btn-dark">${edit ? 'Save' : 'Create & add photos'}</button></div>
       </form></div></div>`;
-    $('#fdForm').dataset.edit = edit ? edit.id : '';
+    $('#fdForm').dataset.edit = edit ? edit.id : ''; FDT.blob = null; FDT.url = fd.cover || null;
     setTimeout(() => $('#fdForm input[name=name]').focus(), 40);
-    $('#fdForm input[name=place]').addEventListener('change', ev => { const c = $('#fdForm input[name=country]'); if (!c.value && typeof GEOP !== 'undefined') { const p = GEOP.find(x => fold(x[0]) === fold(ev.target.value)); if (p) c.value = p[1]; } });
+    $('#fdForm input[name=place]').addEventListener('change', ev => { setTimeout(() => { const c = $('#fdForm input[name=country]'); if (c && !c.value && document.activeElement !== c && typeof GEOP !== 'undefined') { const p = GEOP.find(x => fold(x[0]) === fold(ev.target.value)); if (p) c.value = p[1]; } }, 0); });
   }
   $('#modal').addEventListener('click', ev => {
     const b = ev.target.closest('[data-fd]'); if (!b) return;
     if (b.dataset.fd === 'close') { if (b.classList.contains('modal') && ev.target !== b) return; $('#modal').innerHTML = ''; }
+    if (b.dataset.fd === 'thumb') thumbInput.click();
     if (b.dataset.fd === 'del') {
       const id = $('#fdForm').dataset.edit, fm = folderById(id); if (!fm) return;
       if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to delete (photos are kept)'; return; }
@@ -1639,7 +1702,7 @@ Reply with only JSON in exactly this shape:
       persist('prefs'); $('#modal').innerHTML = ''; S.folder = null; renderMem(); toast(`Deleted “${fm.name}”. Its photos are still in Memories.`);
     }
   });
-  $('#modal').addEventListener('submit', ev => {
+  $('#modal').addEventListener('submit', async ev => {
     if (ev.target.id !== 'fdForm') return;
     ev.preventDefault();
     const d = Object.fromEntries(new FormData(ev.target).entries()), editId = ev.target.dataset.edit;
@@ -1647,13 +1710,15 @@ Reply with only JSON in exactly this shape:
     const clash = FOLDERS().find(x => x.name.toLowerCase() === name.toLowerCase() && x.id !== editId);
     if (clash) return toast('You already have a trip folder with that name.');
     if (d.end && d.start && d.end < d.start) return toast('The trip ends before it starts — check the dates.');
-    const rec = { name, place: String(d.place || '').trim(), country: String(d.country || '').trim(), start: d.start || '', end: d.end || '' };
+    if (!d.start) return toast('Pick when the trip started.');
+    const rec = { name, place: String(d.place || '').trim(), country: String(d.country || '').trim(), start: d.start || '', end: d.end || d.start || '' };
+    if (FDT.blob) { const st = await storeImage(FDT.blob); rec.cover = st.url; if (st.local) toast('Your thumbnail shows for this visit only — photo saving isn’t available here.'); }
     if (editId) {
       const fm = folderById(editId), old = fm.name; Object.assign(fm, rec);
       Object.values(S.mems).forEach(m => { if (m.folder === editId && m.dest === old) { m.dest = name; saveMem(m); } });
       S.folder = name;
     } else { FOLDERS().push({ id: rid('f-'), ...rec }); S.folder = name; }
-    persist('prefs'); $('#modal').innerHTML = '';
+    persist('prefs'); $('#modal').innerHTML = ''; REEL.sig = '';
     if (S.tab !== 'mem') setTab('mem');
     openFolder(name);
     if (!editId) setTimeout(() => pickFiles(name), 350);
@@ -2011,8 +2076,28 @@ Reply with only a JSON array with one object per photo in the same order:
   const STEP = 380;
   const REEL = { year: null, trips: [], sig: '', fh: 300, cur: -1, name: null, ym: null, anim: 0 };
   const placeOf = m => { const fm = m.folder && folderById(m.folder); if (fm) return fm.country || fm.place || fm.name; return m.dest || (m.country && m.country !== 'Unknown' ? m.country : 'Somewhere'); };
-  const reelAll = () => (S.prefs.hideExamples ? realMems() : realMems().concat(SEED.examples)).filter(m => memSrc(m) && okYM(ymOf(m.date))).sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)));
+  const reelAll = () => realMems().filter(m => memSrc(m) && okYM(ymOf(m.date))).sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)));
   const nowYear = () => String(new Date().getFullYear());
+  function rangeItems(t) {
+    if (t.items.length || !t.folder || !t.from) return t.items;
+    const out = [], s = new Date(t.from + 'T12:00:00'), e = new Date((t.to || t.from) + 'T12:00:00');
+    for (let d = new Date(s), k = 0; d <= e && k < 31; d.setDate(d.getDate() + 1), k++) out.push({ id: `r-${t.folder.id}-${k}`, date: d.toISOString().slice(0, 10), photo: memSrc(t.cover), folder: t.folder.id, dest: t.folder.name });
+    return out;
+  }
+  function reelTrips() {
+    const loose = reelAll().filter(m => !(m.folder && folderById(m.folder)));
+    const trips = groupTrips(loose);
+    FOLDERS().forEach(fd => {
+      const items = realMems().filter(m => m.folder === fd.id && memSrc(m) && okYM(ymOf(m.date))).sort((x, y) => (x.date || '').localeCompare(y.date || ''));
+      const cover = fd.cover ? { photo: fd.cover } : items[0];
+      if (!cover) return;
+      const from = fd.start || (items[0] && items[0].date) || new Date().toISOString().slice(0, 10);
+      const t = { key: fd.country || fd.place || fd.name, city: fd.place && fd.place !== fd.country ? fd.place : '', items, from, to: fd.end || (items.length ? items[items.length - 1].date : from), cover, folder: fd };
+      t.items = rangeItems(t); t.real = items.length;
+      trips.push(t);
+    });
+    return trips.sort((x, y) => x.from.localeCompare(y.from));
+  }
   function groupTrips(list) {
     const out = [];
     list.forEach(m => {
@@ -2035,14 +2120,24 @@ Reply with only a JSON array with one object per photo in the same order:
   function renderReel(force) {
     const all = reelAll(), now = nowYear();
     const years = Array.from(new Set(all.map(m => m.date.slice(0, 4)).concat(now))).sort().reverse();
-    const trips = groupTrips(all).reverse();
+    const trips = reelTrips().reverse();
     trips.forEach((t, i) => { t.i = i; });
+    years.splice(0, years.length, ...Array.from(new Set(trips.map(t => t.from.slice(0, 4)).concat(now))).sort().reverse());
     if (!REEL.year) REEL.year = trips[0] ? trips[0].from.slice(0, 4) : now;
-    const sig = trips.map(t => t.items.map(m => m.id).join('.')).join(',') + '|' + years.join(',');
+    const sig = trips.map(t => (t.folder ? t.folder.id + ':' + (t.folder.cover || '') + t.from + t.to : '') + t.items.map(m => m.id).join('.')).join(',') + '|' + years.join(',');
     if (!force && sig === REEL.sig) return;
     REEL.sig = sig; REEL.trips = trips; REEL.years = years; REEL.cur = -1; REEL.ym = null; REEL.calBuilt = false;
     const N = trips.length, rev = trips.slice().reverse();
     $('#reel').style.height = `calc(100vh + ${Math.max(0, N - 1) * STEP + 80}px)`;
+    $('#reel').classList.toggle('empty', !N);
+    if (!N) {
+      $('#reel').style.height = '100vh';
+      $('#strip').innerHTML = `<button class="frame add" data-reel="addtrip" aria-label="Add a thumbnail of your recent trip"><span class="ph"><span class="fa-in"><span class="fa-plus"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><b>Add a thumbnail of your recent trip</b><small>Pick the dates, then upload all its photos & videos</small></span></span></button>`;
+      $('#camScreen').innerHTML = '<div class="cs-empty">Your first trip goes here</div>';
+      $('#rname').innerHTML = `<div class="swap-in"><h2>Your trips<em>start with the most recent one</em></h2></div>`;
+      REEL.cur = -1; $('#strip').style.transform = ''; renderReelCal();
+      return;
+    }
     $('#strip').innerHTML = rev.map(t => `<button class="frame" data-reel="frame" data-i="${t.i}" aria-label="View memories from ${esc(t.key)}${t.city ? ', ' + esc(t.city) : ''}"><span class="ph"><img src="${esc(memSrc(t.cover))}" alt="" loading="lazy" draggable="false"></span></button>`).join('');
     $('#camScreen').innerHTML = `<div class="cs-track">${rev.map(t => `<img src="${esc(memSrc(t.cover))}" alt="" draggable="false">`).join('')}</div>`;
     $('#rname').innerHTML = N
@@ -2054,7 +2149,7 @@ Reply with only a JSON array with one object per photo in the same order:
   }
   const reelP = () => clamp((vmEl.scrollTop - $('#reel').offsetTop) / STEP, 0, Math.max(0, REEL.trips.length - 1));
   function updateReel() {
-    const N = REEL.trips.length; if (!N) { $('#strip').style.transform = ''; return; }
+    const N = REEL.trips.length; if (!N) return;
     const p = Math.round(reelP()), win = $('.strip-win');
     if (p !== REEL.shown) { const dist = REEL.shown == null ? 0 : Math.abs(p - REEL.shown); REEL.shown = p; $('#reel').style.setProperty('--glide', `${dist ? Math.min(0.9 + (dist - 1) * 0.12, 1.7) : 0}s`); }
     const strip = $('#strip');
@@ -2244,8 +2339,10 @@ Reply with only a JSON array with one object per photo in the same order:
     }
     if (a === 'day') reelScrollTo(+b.dataset.trip);
     if (a === 'month' && b.dataset.v) { const i = REEL.trips.findIndex(tr => tr.items.some(m => m.date.startsWith(b.dataset.v))); if (i >= 0) reelScrollTo(i); }
-    if (a === 'frame') openTripGallery(REEL.trips[+b.dataset.i]);
-    if (a === 'cam' && REEL.trips[REEL.cur]) openTripGallery(REEL.trips[REEL.cur]);
+    const openT = t => { if (!t) return; if (t.folder) { openFolder(t.folder.name); return; } openTripGallery(t); };
+    if (a === 'frame') openT(REEL.trips[+b.dataset.i]);
+    if (a === 'cam') { if (REEL.trips[REEL.cur]) openT(REEL.trips[REEL.cur]); else openFolderDialog(); }
+    if (a === 'addtrip') openFolderDialog();
     if (a === 'plan') { setTab('dream'); setTimeout(() => openAddDest({}), 450); }
   });
   let reelRAF = 0;
