@@ -1676,15 +1676,15 @@ Reply with only JSON in exactly this shape:
   });
   function openFolderDialog(edit) {
     const fd = edit || { name: '', place: '', country: '', start: '', end: '' };
-    $('#modal').innerHTML = `<div class="modal" data-fd="close" role="dialog" aria-modal="true" aria-label="${edit ? 'Edit trip folder' : 'New trip folder'}"><div class="dialog fdlg">
+    $('#modal').innerHTML = `<div class="modal" data-fd="close" role="dialog" aria-modal="true" aria-label="${edit ? 'Edit trip' : 'Add a trip'}"><div class="dialog fdlg">
       <button class="icon-btn close" data-fd="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
-      <h3>${edit ? 'Edit trip' : 'New trip folder'}</h3><p class="lead">One folder per trip. Drop in as many photos and videos as you like — they stay together and show up in your reel.</p>
+      <h3>${edit ? 'Edit trip' : 'Add a trip'}</h3><p class="lead">Pick a thumbnail and the dates, then drop in as many photos and videos as you like — they stay together in your reel.</p>
       <form class="form" id="fdForm" autocomplete="off">
         <div class="fd-thumb"><button type="button" class="fd-th" data-fd="thumb" aria-label="Choose a thumbnail">${fd.cover ? `<img src="${esc(fd.cover)}" alt="">` : '<span><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Thumbnail</span>'}</button><div><b>Trip thumbnail</b><small>The photo that shows for this trip in your reel. You can add all the other photos next.</small></div></div>
         <label>Trip name<input name="name" required maxlength="60" value="${esc(fd.name)}" placeholder="e.g. Japan in spring, Goa with the girls"></label>
         <div class="row" style="grid-template-columns:1.3fr 1fr"><label>Place<input name="place" value="${esc(fd.place)}" placeholder="Kyoto"></label><label>Country<input name="country" value="${esc(fd.country)}" placeholder="Japan"></label></div>
         <div class="row" style="grid-template-columns:1fr 1fr"><label>From<input type="date" name="start" required value="${esc(fd.start || '')}"></label><label>To<input type="date" name="end" value="${esc(fd.end || '')}"></label></div>
-        <div class="actions">${edit ? '<button type="button" class="btn btn-ghost fd-del" data-fd="del">Delete folder</button><span style="flex:1"></span>' : ''}<button type="button" class="btn btn-ghost" data-fd="close">Cancel</button><button class="btn btn-dark">${edit ? 'Save' : 'Create & add photos'}</button></div>
+        <div class="actions">${edit ? '<button type="button" class="btn btn-ghost fd-del" data-fd="del">Delete trip</button><span style="flex:1"></span>' : ''}<button type="button" class="btn btn-ghost" data-fd="close">Cancel</button><button class="btn btn-dark">${edit ? 'Save' : 'Create & add photos'}</button></div>
       </form></div></div>`;
     $('#fdForm').dataset.edit = edit ? edit.id : ''; FDT.blob = null; FDT.url = fd.cover || null;
     setTimeout(() => $('#fdForm input[name=name]').focus(), 40);

@@ -38,7 +38,7 @@
       const draw = (msg, err) => {
         box.innerHTML = `<form class="auth-card" novalidate>
           <h1>Wander <em>Passport</em></h1>
-          <p>${mode === 'in' ? 'Sign in to your dream board, trip plans and memories.' : 'Create your account. Your board, trips and photos stay private to you.'}</p>
+          <p>${mode === 'in' ? 'Sign in to your travel visionary, trip plans and memories.' : 'Create your account. Your board, trips and photos stay private to you.'}</p>
           ${msg ? `<div class="auth-msg ${err ? 'err' : ''}" role="${err ? 'alert' : 'status'}">${msg}</div>` : ''}
           <label>Email<input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label>
           <label>Password<input type="password" name="password" autocomplete="${mode === 'in' ? 'current-password' : 'new-password'}" required minlength="6" placeholder="${mode === 'in' ? 'Your password' : 'At least 6 characters'}"></label>

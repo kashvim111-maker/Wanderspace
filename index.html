@@ -1282,6 +1282,69 @@ body{font-synthesis-weight:none}
 .tg-drop:hover .ic{transform:translateY(-3px)}
 .tg-drop b{font-family:var(--f-display);font-weight:400;font-size:30px}
 .tg-drop small{opacity:.8;font-size:13px}
+
+/* ================= Unified frosted-glass pop-ups ================= */
+:root{
+  --pop-r:30px;
+  --pop-line:rgba(255,255,255,.72);
+  --pop-blur:blur(46px) saturate(1.75);
+  --pop-bg:radial-gradient(90% 70% at 0% 0%,rgba(255,255,255,.6),rgba(255,255,255,0) 60%),radial-gradient(70% 60% at 100% 100%,rgba(196,178,255,.28),rgba(196,178,255,0) 70%),linear-gradient(150deg,rgba(255,255,255,.52),rgba(255,255,255,.26) 55%,rgba(244,238,255,.34));
+  --pop-shadow:0 60px 120px -50px rgba(18,10,38,.6),0 24px 50px -30px rgba(18,10,38,.35),inset 0 1px 0 rgba(255,255,255,.95),inset 0 0 0 1px rgba(255,255,255,.22);
+  --pop-field:rgba(255,255,255,.5);
+  --pop-field-line:rgba(255,255,255,.85);
+  --pop-focus:#8b78c4;
+}
+@keyframes popIn{from{opacity:0;transform:translateY(18px) scale(.97);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.modal{background:radial-gradient(120% 90% at 50% 0%,rgba(160,140,210,.2),rgba(22,16,36,.4));backdrop-filter:blur(24px) saturate(1.35);-webkit-backdrop-filter:blur(24px) saturate(1.35)}
+.dialog,.pl-pop-card,.queue{background:var(--pop-bg);border:1px solid var(--pop-line);backdrop-filter:var(--pop-blur);-webkit-backdrop-filter:var(--pop-blur);box-shadow:var(--pop-shadow);border-radius:var(--pop-r)}
+.dialog,.pl-pop-card,.tgal,.lightbox,.planner{animation:popIn .55s cubic-bezier(.2,.8,.2,1)}
+.dialog{padding:30px}
+.dialog.npop{padding:0}
+.dialog h3,.pl-pop-card h3{font-size:36px;letter-spacing:-.01em;line-height:1.05;color:#231d33}
+.dialog .lead{color:#5d5470;font-size:14.5px;line-height:1.55;margin:8px 0 20px}
+.pl-pop{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);background:rgba(18,12,30,.3)}
+/* fields */
+.dialog label,.pl-pop-card label{color:#4d4560}
+.dialog input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),.dialog select,.dialog textarea,
+.pl-pop-card input:not([type=checkbox]):not([type=radio]),.pl-pop-card select,.pl-pop-card textarea,
+.lightbox aside input,.lightbox aside select{
+  background:var(--pop-field)!important;border:1px solid var(--pop-field-line)!important;border-radius:14px!important;
+  box-shadow:inset 0 1px 2px rgba(42,36,56,.06),0 1px 0 rgba(255,255,255,.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  color:#231d33;transition:border-color .25s,box-shadow .25s,background .25s}
+.dialog input::placeholder,.pl-pop-card input::placeholder{color:#8f86a0}
+.dialog input:focus,.dialog select:focus,.dialog textarea:focus,.pl-pop-card input:focus,.pl-pop-card select:focus,.pl-pop-card textarea:focus,.lightbox aside input:focus,.lightbox aside select:focus{
+  outline:none!important;background:rgba(255,255,255,.78)!important;border-color:var(--pop-focus)!important;box-shadow:0 0 0 4px rgba(139,120,196,.22)}
+/* buttons */
+.dialog .btn-ghost,.pl-pop-card .btn-ghost,.lightbox .btn-ghost{background:rgba(255,255,255,.38);border:1px solid rgba(255,255,255,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:background .25s,transform .25s}
+.dialog .btn-ghost:hover,.pl-pop-card .btn-ghost:hover{background:rgba(255,255,255,.7);transform:translateY(-1px)}
+.dialog .btn-dark,.pl-pop-card .btn-dark{background:linear-gradient(180deg,#3a3150,#231d33);box-shadow:0 14px 26px -12px rgba(35,29,51,.8),inset 0 1px 0 rgba(255,255,255,.18);transition:transform .25s,box-shadow .25s}
+.dialog .btn-dark:hover,.pl-pop-card .btn-dark:hover{transform:translateY(-1px);box-shadow:0 18px 30px -12px rgba(35,29,51,.85),inset 0 1px 0 rgba(255,255,255,.18)}
+.dialog .fd-del{color:#b2364a;border-color:rgba(178,54,74,.25)}
+/* close buttons — one glass circle everywhere */
+.modal .icon-btn.close,.modal .close.icon-btn{width:40px;height:40px;background:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 20px -12px rgba(20,14,34,.5);color:#231d33;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background .25s}
+.modal .icon-btn.close:hover{background:rgba(255,255,255,.85);transform:rotate(90deg)}
+.dialog>.close,.dialog .close{position:absolute;top:18px;right:18px;z-index:4}
+/* add-destination pop-up */
+.np-media{background:rgba(255,255,255,.12);border-right:1px solid rgba(255,255,255,.45)}
+.np-media:has(img){background:#1d1828}
+.np-drop{background:linear-gradient(160deg,rgba(255,255,255,.42),rgba(255,255,255,.16));border:1.5px dashed rgba(110,90,158,.38);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.np-drop:hover,.np-media.over .np-drop{background:rgba(255,255,255,.62);border-color:#8b78c4}
+.np-dico{background:rgba(255,255,255,.75);border:1px solid #fff}
+.np-form{padding:32px 30px 26px}
+.np-toggle{background:rgba(255,255,255,.32);border:1px solid rgba(255,255,255,.75);backdrop-filter:blur(10px)}
+.np-mapwrap{border:1px solid rgba(255,255,255,.8);box-shadow:0 10px 24px -18px rgba(42,36,56,.5)}
+.np-maptools{background:rgba(255,255,255,.55);backdrop-filter:blur(12px)}
+.np-sugg{background:var(--pop-bg),rgba(255,255,255,.7);border:1px solid var(--pop-line);backdrop-filter:var(--pop-blur);-webkit-backdrop-filter:var(--pop-blur)}
+.np-guess{background:rgba(196,178,255,.32);border:1px solid rgba(255,255,255,.7)}
+.np-note{color:#7b7190}
+/* trip form */
+.fd-thumb .fd-th{border-color:rgba(110,90,158,.35);background:rgba(255,255,255,.4)}
+/* memory viewer + gallery + planner use the same rim and radius */
+.tgal{border-radius:var(--pop-r);border:1px solid rgba(255,255,255,.55);backdrop-filter:blur(46px) saturate(1.6);-webkit-backdrop-filter:blur(46px) saturate(1.6);box-shadow:var(--pop-shadow)}
+.lightbox{border-radius:var(--pop-r);border:1px solid rgba(255,255,255,.4);background:rgba(18,14,28,.55);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);box-shadow:var(--pop-shadow)}
+.lightbox aside{background:var(--pop-bg);backdrop-filter:var(--pop-blur);-webkit-backdrop-filter:var(--pop-blur);border-left:1px solid var(--pop-line)}
+.planner{border-radius:var(--pop-r);border:1px solid rgba(255,255,255,.35);box-shadow:var(--pop-shadow)}
+.toast{border-radius:16px}
 </style>
 </head>
 <body>
@@ -1291,7 +1354,7 @@ body{font-synthesis-weight:none}
     <span class="brand-name">Wander<em>Passport</em></span>
   </button>
   <nav class="tabs" role="tablist" aria-label="Sections">
-    <button class="tab" role="tab" id="tab-dream" aria-selected="true">Dream board <span class="count" id="c-trips"></span></button>
+    <button class="tab" role="tab" id="tab-dream" aria-selected="true">My Travel Visionary <span class="count" id="c-trips"></span></button>
     <button class="tab" role="tab" id="tab-mem" aria-selected="false">Memories <span class="count" id="c-mem"></span></button>
   </nav>
   <div class="top-actions">
@@ -1301,7 +1364,7 @@ body{font-synthesis-weight:none}
 </header>
 
 <main>
-  <section class="view" id="view-dream" aria-label="Dream board">
+  <section class="view" id="view-dream" aria-label="My Travel Visionary">
     <div class="bempty" id="boardEmpty" hidden>
       <div class="be-ghost g1" aria-hidden="true"></div><div class="be-ghost g2" aria-hidden="true"></div><div class="be-ghost g3" aria-hidden="true"></div>
       <p class="be-kicker">Places I’m going</p>
