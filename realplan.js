@@ -49,7 +49,8 @@
   /* ---------- OpenStreetMap lookup: Photon first, Nominatim as backup (1 request a second) ---------- */
   let nomQ = Promise.resolve(), photonFails = 0, photonOffUntil = 0;
   const nomSlot = () => (nomQ = nomQ.then(() => sleep(1100)));
-  async function lookup(name, near, radius) {
+  const AREA = /^(place|boundary):|\b(city|town|village|hamlet|suburb|municipality|administrative|county|state|country|region)\b/;
+  async function lookup(name, near, radius, area) {
     const want = tokens(name);
     if (!want.length) return null; // generic ("Sunset viewpoint") — not a named place
     const bias = near ? `&lat=${near[0]}&lon=${near[1]}&location_bias_scale=0.3&zoom=11` : '';
@@ -61,7 +62,8 @@
     for (const f of (d && d.features) || []) {
       const p = f.properties || {}, ll = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
       if (near && hav(near, ll) > radius) continue;
-      if (!matches(want, [p.name, p.street, p.city].filter(Boolean).join(' '))) continue;
+      if (!area && AREA.test(`${p.osm_key}:${p.osm_value} ${p.type || ''}`)) continue; // a town called "Marly" is not "Café Marly"
+      if (!matches(want, p.name || '')) continue;
       const addr = [p.name, p.street, p.district || p.locality, p.city || p.county, p.country].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(', ');
       return { ll, addr: addr.slice(0, 160), osm: p.osm_type && p.osm_id ? `${{ N: 'node', W: 'way', R: 'relation' }[p.osm_type] || 'node'}/${p.osm_id}` : '' };
     }
@@ -71,6 +73,7 @@
     for (const x of n || []) {
       const ll = [+x.lat, +x.lon];
       if (near && hav(near, ll) > radius) continue;
+      if (!area && AREA.test(`${x.category}:${x.type} ${x.addresstype || ''}`)) continue;
       if (!matches(want, [x.name, ...Object.values(x.namedetails || {})].join(' '))) continue;
       return { ll, addr: String(x.display_name || '').split(', ').slice(0, 4).join(', ').slice(0, 160), osm: x.osm_type && x.osm_id ? `${x.osm_type}/${x.osm_id}` : '' };
     }
@@ -150,7 +153,7 @@
     LOG.length = 0; DEADLINE = Date.now() + 60000; // lookups budget
     const radius = 140;
     let center = dest.ll && isFinite(dest.ll[0]) ? dest.ll : null;
-    if (!center) { const h = await lookup(`${dest.name} ${dest.country || ''}`.trim(), null, 1e9); if (h) center = h.ll; }
+    if (!center) { const h = await lookup(`${dest.name} ${dest.country || ''}`.trim(), null, 1e9, true); if (h) center = h.ll; }
     const days = (plan.itinerary || []).slice(0, 5).map(d => ({ ...d, items: (d.items || []).slice(0, 8).map(x => ({ ...x })) }));
     const report = { checked: 0, found: 0, replaced: 0, dropped: 0, legs: 0, routed: 0 };
 
