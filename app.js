@@ -820,6 +820,9 @@
       <div class="pl-body">${planBody(t)}</div>
     </div></div>`;
     if (IT.tab === 'route' && !IT.busy) wireJourney(t);
+    // "About this plan" folds away as you scroll the places or checklist
+    const sh = $('.pl-body .sheet'), pl = $('.planner');
+    if (sh && pl) sh.addEventListener('scroll', () => pl.classList.toggle('scrolled', sh.scrollTop > 24), { passive: true });
   }
   function notesHTML(t) {
     const n = planNotes(t); if (!n.length || IT.busy) return '';
