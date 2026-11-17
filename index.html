@@ -1345,6 +1345,17 @@ body{font-synthesis-weight:none}
 .lightbox aside{background:var(--pop-bg);backdrop-filter:var(--pop-blur);-webkit-backdrop-filter:var(--pop-blur);border-left:1px solid var(--pop-line)}
 .planner{border-radius:var(--pop-r);border:1px solid rgba(255,255,255,.35);box-shadow:var(--pop-shadow)}
 .toast{border-radius:16px}
+
+/* upload progress sits above any pop-up */
+.queue{z-index:150}
+.q-item{grid-template-columns:42px 1fr 26px;position:relative}
+.q-prog{display:block;height:3px;margin-top:5px;border-radius:3px;background:linear-gradient(90deg,rgba(139,120,196,.15),#8b78c4,rgba(139,120,196,.15));background-size:200% 100%;animation:qprog 1.2s linear infinite}
+@keyframes qprog{to{background-position:-200% 0}}
+.q-x{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.5);color:#4d4560;display:grid;place-items:center;cursor:pointer;transition:background .2s,color .2s,transform .3s cubic-bezier(.34,1.56,.64,1)}
+.q-x:hover{background:#e0455a;border-color:#e0455a;color:#fff;transform:rotate(90deg)}
+/* the strip paper always runs back up into the slot, even with one trip */
+#strip::before{content:"";position:absolute;left:0;right:0;bottom:calc(100% - 1px);height:300vh;background:#fffdf9;pointer-events:none}
+.reel.empty #strip::before{display:none}
 </style>
 </head>
 <body>
@@ -1355,7 +1366,7 @@ body{font-synthesis-weight:none}
   </button>
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button class="tab" role="tab" id="tab-dream" aria-selected="true">My Travel Visionary <span class="count" id="c-trips"></span></button>
-    <button class="tab" role="tab" id="tab-mem" aria-selected="false">Memories <span class="count" id="c-mem"></span></button>
+    <button class="tab" role="tab" id="tab-mem" aria-selected="false">My Camera Roll <span class="count" id="c-mem"></span></button>
   </nav>
   <div class="top-actions">
     <span class="save-state" id="save" data-s="idle">Starter board</span>
@@ -1391,7 +1402,7 @@ body{font-synthesis-weight:none}
     <div class="hint">Click a destination to open its passport · drag to arrange · scroll to pan · Ctrl/⌘ + scroll to zoom</div>
   </section>
 
-  <section class="view" id="view-mem" aria-label="Memories" hidden>
+  <section class="view" id="view-mem" aria-label="My Camera Roll" hidden>
     <header class="mhero">
       <div class="mhero-media" id="heroMedia"><video id="heroVid" autoplay muted loop playsinline preload="auto" poster="img/hero-poster.jpg" aria-label="A traveller walking down a cherry-blossom lane in Japan"><source src="img/hero.mp4" type="video/mp4"></video></div>
       <div class="mhero-in" id="heroIn">

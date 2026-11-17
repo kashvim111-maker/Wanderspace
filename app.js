@@ -1842,7 +1842,7 @@ Reply with only JSON in exactly this shape:
     q.local = true; q.url = URL.createObjectURL(f); q.thumb = q.preview || null;
   }
   async function classify(batch) {
-    batch.forEach(q => { q.state = q.gps ? 'Reading GPS…' : 'Claude is looking…'; }); renderQueue();
+    batch.forEach(q => { q.state = q.gps ? 'Reading GPS…' : 'Finding the place…'; }); renderQueue();
     const out = batch.map(() => null);
     if (caps.sample) {
       let canImages = false;
@@ -1896,10 +1896,15 @@ Reply with only a JSON array with one object per photo in the same order:
       const box = $('#queue'), q = S.queue;
       if (!q.length) { box.hidden = true; return; }
       const done = q.filter(x => x.rec).length;
-      box.hidden = false;
-      box.innerHTML = `<div class="q-head"><span>${done < q.length ? `Sorting ${done} of ${q.length}…` : `Sorted ${q.length} ${q.length === 1 ? 'memory' : 'memories'}`}</span>${done === q.length ? '<button class="link" id="qClear">Dismiss</button>' : ''}</div>
+      box.hidden = false; box.classList.toggle('over-modal', !!$('#modal').children.length);
+      box.innerHTML = `<div class="q-head"><span>${done < q.length ? `Uploading ${done + 1 > q.length ? q.length : done + 1} of ${q.length}…` : `Added ${q.length} ${q.length === 1 ? "memory" : "memories"}`}</span>${done === q.length ? '<button class="link" id="qClear">Dismiss</button>' : ''}</div>
         <div class="bar"><i style="width:${Math.round((done / q.length) * 100)}%"></i></div>
-        <div class="q-list">${q.map(x => `<div class="q-item"><div class="th">${x.preview ? `<img src="${x.preview}" alt="">` : ''}</div><div style="min-width:0"><div class="fn">${esc(x.file.name)}</div><div class="stt ${x.ok ? 'ok' : ''}">${esc(x.state || 'Waiting…')}</div></div></div>`).join('')}</div>`;
+        <div class="q-list">${q.map(x => `<div class="q-item"><div class="th">${x.preview ? `<img src="${x.preview}" alt="">` : ''}</div><div style="min-width:0"><div class="fn">${esc(x.file.name)}</div><div class="stt ${x.ok ? 'ok' : ''}">${esc(x.state || 'Waiting…')}</div>${x.rec ? '' : '<i class="q-prog"></i>'}</div>${x.rec ? '' : `<button class="q-x" data-qx="${esc(x.id)}" aria-label="Cancel uploading ${esc(x.file.name)}"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`}</div>`).join('')}</div>`;
+      box.querySelectorAll('[data-qx]').forEach(b => b.addEventListener('click', () => {
+        const it = S.queue.find(x => x.id === b.dataset.qx); if (!it) return;
+        it.cancel = true; it.started = true; S.queue = S.queue.filter(x => x !== it);
+        toast(`Cancelled ${it.file.name}`); renderQueue();
+      }));
       $('#qClear')?.addEventListener('click', () => { S.queue = []; renderQueue(); });
     });
   }
@@ -1921,13 +1926,15 @@ Reply with only a JSON array with one object per photo in the same order:
         if (!batch.length) break;
         batch.forEach(q => (q.started = true));
         await Promise.all(batch.map(prep));
-        await Promise.all(batch.map(upload));
-        await classify(batch);
-        for (const q of batch) { S.mems[q.id] = q.rec; await saveMem(q.rec); }
+        const live = () => batch.filter(q => !q.cancel);
+        await Promise.all(live().map(upload));
+        if (live().length) await classify(live());
+        for (const q of batch) { if (q.cancel || !q.rec) continue; S.mems[q.id] = q.rec; await saveMem(q.rec); }
         renderMem(); refreshGallery();
       }
     } finally { busyUpload = false; }
     const n = S.queue.filter(x => x.rec).length;
+    if (!n) return;
     if (S.queue.some(x => x.local)) toast('Added — but saving isn’t available in this view, so these will clear when you leave.');
     else toast(dest ? `${n} ${n === 1 ? 'memory' : 'memories'} added to ${dest}.` : `${n} ${n === 1 ? 'memory' : 'memories'} sorted into your places.`);
   }
