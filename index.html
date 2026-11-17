@@ -1453,6 +1453,73 @@ body{font-synthesis-weight:none}
 .loc-now{margin:0 0 12px;font-size:13.5px;color:#3d3550}
 .loc-msg{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(255,196,120,.35);border:1px solid rgba(255,255,255,.7);color:#5a3200;font-size:13px;line-height:1.45}
 .locdlg .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ===== all pop-ups: dark frosted glass, white readable text ===== */
+:root{
+  --pop-bg:radial-gradient(90% 70% at 0% 0%,rgba(255,255,255,.12),rgba(255,255,255,0) 60%),radial-gradient(70% 60% at 100% 100%,rgba(150,120,230,.2),rgba(150,120,230,0) 70%),linear-gradient(150deg,rgba(46,38,66,.78),rgba(24,18,38,.72));
+  --pop-line:rgba(255,255,255,.3);
+  --pop-field:rgba(255,255,255,.94);
+  --pop-field-line:rgba(255,255,255,.95);
+}
+.dialog,.queue,.lightbox aside{color:#fff}
+.dialog *:not(input):not(select):not(textarea):not(option),.queue *:not(input),.lightbox aside *:not(input):not(select){color:inherit}
+.dialog h3,.pl-pop-card h3{color:#fff}
+.dialog .lead,.dialog .np-note,.dialog .note{color:rgba(255,255,255,.88)!important}
+.dialog label,.dialog .k,.td-grid label>span{color:#fff}
+.dialog input::placeholder,.dialog textarea::placeholder{color:#5f5672!important}
+.dialog input,.dialog select,.dialog textarea{color:#231d33!important}
+/* primary = solid white, secondary = glass */
+.dialog .btn-dark,.queue .btn-dark{background:#fff!important;color:#231d33!important;box-shadow:0 12px 24px -12px rgba(0,0,0,.6)!important}
+.dialog .btn-dark *{color:#231d33!important}
+.dialog .btn-ghost,.lightbox .btn-ghost{background:rgba(255,255,255,.14)!important;border:1px solid rgba(255,255,255,.5)!important;color:#fff!important}
+.dialog .btn-ghost:hover{background:rgba(255,255,255,.26)!important}
+.modal .icon-btn.close,.modal .close.icon-btn{background:rgba(255,255,255,.16)!important;border-color:rgba(255,255,255,.5)!important;color:#fff!important}
+.modal .icon-btn.close:hover{background:rgba(255,255,255,.3)!important}
+.dialog .fd-del,.dialog .danger{color:#ffc2cc!important;border-color:rgba(255,194,204,.5)!important}
+/* add-destination parts */
+.np-toggle{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.35)}
+.np-toggle .ind{background:#fff}
+.dialog .np-toggle button{color:#fff!important}
+.dialog .np-toggle button[aria-selected="true"]{color:#231d33!important}
+.dialog .np-sugg,.dialog .np-sugg *{color:#231d33!important}
+.dialog .np-sugg button span{color:#5f5672!important}
+.np-media{background:rgba(255,255,255,.04);border-right-color:rgba(255,255,255,.2)}
+.np-drop{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.45)}
+.np-drop:hover,.np-media.over .np-drop{background:rgba(255,255,255,.16);border-color:#fff}
+.dialog .np-dico,.dialog .loc-ic{color:#5b47a8!important}
+.np-maptools{background:rgba(20,16,30,.6)}
+.np-guess{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35)}
+/* small panels inside pop-ups */
+.lim-badge{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.45)}
+.lim-opt{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.35)}
+.lim-opt:hover{background:rgba(255,255,255,.2)}
+.dialog .lim-opt small,.dialog .loc-pts,.dialog .loc-now{color:rgba(255,255,255,.88)!important}
+.lim-ok{background:rgba(126,214,160,.18);border-color:rgba(126,214,160,.5)}
+.loc-msg{background:rgba(255,180,90,.18);border-color:rgba(255,180,90,.55)}
+.loc-ic{background:#fff}
+.fd-thumb .fd-th{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.45)}
+.lightbox aside{background:var(--pop-bg)}
+.queue{background:var(--pop-bg)}
+.queue .q-x{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.5)}
+/* camera-roll gallery: 4 across */
+.tg-grid{columns:4 200px}
+
+/* contrast fixes from the audit */
+.tgal{background:var(--pop-bg)!important;border-color:var(--pop-line)!important;color:#fff}
+.tgal .tg-head h3,.tgal .tg-head h3 em,.tgal .tg-head p{color:#fff}
+.tgal .tg-head p{opacity:.9}
+.tgal .tg-btn{background:#fff;color:#231d33}
+.tgal .tg-btn svg{color:#231d33}
+.tgal .tg-btn.tg-alt{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.5);color:#fff}
+.tgal .tg-btn.tg-alt svg{color:#fff}
+.np-media{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02))!important}
+.np-media:has(img){background:#14101e!important}
+.np-drop b,.np-drop small,.np-drop span{color:#fff}
+.np-drop small{opacity:.88}
+.q-item .stt{color:rgba(255,255,255,.82)}
+.dialog .form label,.fdlg .form label{color:#fff}
+.q-item .stt.ok{color:#a6efc1}
+.queue .q-head b,.queue .q-name,.queue .q-item b{color:#fff}
 </style>
 </head>
 <body>
