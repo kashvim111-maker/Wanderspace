@@ -28,6 +28,7 @@
   .auth-msg{margin:4px 0 8px;padding:10px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;background:rgba(255,255,255,.16)}
   .auth-msg.err{background:rgba(220,60,80,.35)}
   .acct{position:fixed;z-index:60;left:18px;bottom:18px;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-radius:999px;font:600 12.5px Figtree,system-ui,sans-serif;color:#2a2438;background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);backdrop-filter:blur(16px);box-shadow:0 10px 30px -14px rgba(0,0,0,.5)}
+  .acct .acct-loc{background:rgba(255,255,255,.7);color:#2a2438;border:1px solid rgba(42,36,56,.12)}
   .acct button{border:0;border-radius:999px;padding:7px 12px;background:#2a2438;color:#fff;font:600 12px Figtree,system-ui,sans-serif;cursor:pointer}`;
   const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
@@ -69,8 +70,9 @@
   }
   const sessionP = SB.auth.getSession().then(({ data }) => data.session || authScreen()).then(s => {
     const chip = document.createElement('div'); chip.className = 'acct';
-    chip.innerHTML = `<span>${(s.user.email || '').replace(/</g, '&lt;')}</span><button type="button">Sign out</button>`;
-    chip.querySelector('button').onclick = async () => { await SB.auth.signOut(); location.reload(); };
+    chip.innerHTML = `<button type="button" class="acct-loc" title="Your location">Set location</button><span>${(s.user.email || '').replace(/</g, '&lt;')}</span><button type="button" class="acct-out">Sign out</button>`;
+    chip.querySelector('.acct-out').onclick = async () => { await SB.auth.signOut(); location.reload(); };
+    chip.querySelector('.acct-loc').onclick = () => window.WP_LOC && window.WP_LOC();
     document.body.appendChild(chip);
     return s;
   });

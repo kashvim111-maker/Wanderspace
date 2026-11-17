@@ -1183,7 +1183,7 @@
       IT.busy = false; if (S.trips[t.id] && IT.id === t.id) renderItin(); return;
     }
     IT.busy = true; IT.err = ''; IT.tab = 'route'; IT.day = 0; renderItin();
-    const prompt = `Plan a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.region ? ` (areas: ${t.region})` : ''}${t.target ? `, travelling around ${fmtMonth(t.target).toLowerCase()}` : ''}. The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.
+    const prompt = `Plan a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.region ? ` (areas: ${t.region})` : ''}${t.target ? `, travelling around ${fmtMonth(t.target).toLowerCase()}` : ''}. ${S.prefs.home && S.prefs.home.country ? `The traveller lives in ${homeLabel()}; give budgets in the currency of ${S.prefs.home.country}, per person, including travel from ${S.prefs.home.city || S.prefs.home.country}.` : 'The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.'}
 Use real, currently operating places only — specific named cafés, restaurants, temples, museums, viewpoints, nature spots and experiences. Group each day geographically so it is walkable or a short ride.
 Reply with only JSON in exactly this shape:
 {"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","tagline":"max 12 words, evocative",
@@ -1366,7 +1366,7 @@ Reply with only JSON in exactly this shape:
 
   /* planning: Claude when available, a starter plan otherwise */
   function planPrompt(t) {
-    return `Plan the first ${Math.min(t.days, 5)} days of a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.ll ? ` (around ${t.ll[0].toFixed(2)}, ${t.ll[1].toFixed(2)})` : ''}. The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.
+    return `Plan the first ${Math.min(t.days, 5)} days of a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.ll ? ` (around ${t.ll[0].toFixed(2)}, ${t.ll[1].toFixed(2)})` : ''}. ${S.prefs.home && S.prefs.home.country ? `The traveller lives in ${homeLabel()}; give budgets in the currency of ${S.prefs.home.country}, per person, including travel from ${S.prefs.home.city || S.prefs.home.country}.` : 'The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.'}
 Use real, currently operating places only — specific named cafés, restaurants, temples, museums, viewpoints, nature spots and experiences. Group each day geographically so it is walkable or a short ride.
 Reply with only JSON in exactly this shape:
 {"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","tagline":"max 12 words, evocative",
@@ -2600,6 +2600,53 @@ Reply with only a JSON array with one object per photo in the same order:
   window.addEventListener('hashchange', () => setTab(location.hash === '#memories' ? 'mem' : 'dream'));
   function refreshClaudeUI() { if (IT.mode === 'plan') renderItin(); }
 
+  /* ---------- current location (asked once after sign-in, live site) ---------- */
+  function homeLabel() { const h = S.prefs.home; return h ? [h.city, h.country].filter(Boolean).join(', ') : ''; }
+  function paintLocChip() { const b = document.querySelector('.acct .acct-loc'); if (b) b.textContent = S.prefs.home ? '📍 ' + (S.prefs.home.city || S.prefs.home.country) : 'Set location'; }
+  async function locate() {
+    const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 }));
+    const ll = [Math.round(pos.coords.latitude * 10) / 10, Math.round(pos.coords.longitude * 10) / 10]; // city level (~10 km), never the exact spot
+    let city = '', country = '', cc = '';
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${ll[0]}&lon=${ll[1]}&format=jsonv2&zoom=10&accept-language=en`);
+      const j = await r.json(); const ad = j.address || {};
+      city = ad.city || ad.town || ad.village || ad.county || ad.state_district || ad.state || ''; country = ad.country || ''; cc = (ad.country_code || '').toUpperCase();
+    } catch (e) { /* keep coordinates only */ }
+    return { ll, city, country, cc, at: new Date().toISOString().slice(0, 10) };
+  }
+  function askLocation(force) {
+    if (!window.WP_FEEDBACK || !navigator.geolocation) return; // live site only
+    paintLocChip();
+    if (!force && (S.prefs.home || S.prefs.locAsked)) return;
+    if (!force && $('#modal').innerHTML) return setTimeout(() => askLocation(false), 4000); // wait for other pop-ups
+    $('#modal').innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Turn on your location"><div class="dialog locdlg">
+      <div class="loc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+      <h3>Turn on your location?</h3>
+      <p class="lead">Wander Passport uses your current city to plan trips from where you are — travel to your destination, budgets in your currency and your time zone.</p>
+      <ul class="loc-pts"><li>We save only your city (an area about 10 km wide), never your exact position.</li><li>You can change or remove it anytime from the account chip, bottom left.</li></ul>
+      ${S.prefs.home ? `<p class="loc-now">Now set to <b>${esc(homeLabel())}</b></p>` : ''}
+      <p class="loc-msg" id="locMsg" hidden></p>
+      <div class="actions">${S.prefs.home ? '<button class="btn btn-ghost" data-loc="clear">Remove location</button>' : ''}<button class="btn btn-ghost" data-loc="later">Not now</button><button class="btn btn-dark" data-loc="allow">Allow location</button></div>
+    </div></div>`;
+    const done = () => { $('#modal').onclick = null; S.prefs.locAsked = true; persist('prefs'); closeModal(); paintLocChip(); };
+    $('#modal').onclick = async ev => {
+      const b = ev.target.closest('[data-loc]'); if (!b) return;
+      const k = b.dataset.loc;
+      if (k === 'later') return done();
+      if (k === 'clear') { delete S.prefs.home; done(); return toast('Location removed.'); }
+      b.disabled = true; b.textContent = 'Finding you…';
+      try {
+        S.prefs.home = await locate(); done();
+        toast(`Location on — trips will be planned from ${homeLabel() || 'where you are'}.`);
+      } catch (e) {
+        b.disabled = false; b.textContent = 'Try again';
+        const m = $('#locMsg'); m.hidden = false;
+        m.textContent = e && e.code === 1 ? 'Location is blocked for this site. Turn it on in your browser’s site settings (the icon left of the address bar), then try again — or choose Not now.' : 'We couldn’t get your location just now. Check that location services are on, then try again.';
+      }
+    };
+  }
+  window.WP_LOC = () => askLocation(true);
+
   function renderAll() { renderWorld(); fitBoard(); renderMem(); renderCounts(); }
 
   renderTray();
@@ -2607,5 +2654,5 @@ Reply with only a JSON array with one object per photo in the same order:
   requestAnimationFrame(fitBoard);
   setTab(location.hash === '#memories' ? 'mem' : 'dream');
   setSave('idle');
-  connect();
+  Promise.resolve(connect()).finally(() => setTimeout(() => askLocation(false), 1400));
 })();
