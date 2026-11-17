@@ -12,12 +12,22 @@
   const tokens = s => fold(s).split(/[^a-z0-9Ͱ-῿぀-鿿가-힯]+/).filter(w => w.length > 2 && !STOP.has(w));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  async function getJSON(url, ms = 9000, tries = 2) {
+  // a hard deadline that doesn't depend on the network stack honouring abort
+  const within = (p, ms) => Promise.race([p, sleep(ms).then(() => { throw new Error('timeout'); })]);
+  const LOG = [];
+  let DEADLINE = Infinity; // after this, remaining legs use estimates instead of waiting on slow servers
+  const late = () => Date.now() > DEADLINE;
+  async function getJSON(url, ms = 7000, tries = 2) {
     for (let k = 0; k < tries; k++) {
-      const c = new AbortController(); const tm = setTimeout(() => c.abort(), ms);
-      try { const r = await fetch(url, { signal: c.signal, headers: { Accept: 'application/json' } }); if (r.ok) return await r.json(); if (r.status !== 429 && r.status < 500) return null; }
-      catch (e) { /* retry */ } finally { clearTimeout(tm); }
-      if (k < tries - 1) await sleep(700 * (k + 1));
+      if (late()) return null;
+      const c = new AbortController(); const t0 = Date.now();
+      try {
+        const r = await within(fetch(url, { signal: c.signal, headers: { Accept: 'application/json' } }), ms);
+        if (r.ok) { const j = await within(r.json(), ms); LOG.push([new URL(url).host, Date.now() - t0]); return j; }
+        LOG.push([new URL(url).host, r.status]);
+        if (r.status !== 429 && r.status < 500) return null;
+      } catch (e) { LOG.push([new URL(url).host, 'timeout']); try { c.abort(); } catch (x) { /* ignore */ } }
+      if (k < tries - 1) await sleep(600 * (k + 1));
     }
     return null;
   }
@@ -53,7 +63,7 @@
 
   /* ---------- routing ---------- */
   async function osrm(profile, a, b) {
-    const d = await getJSON(`https://routing.openstreetmap.de/routed-${profile}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=false`, 8000);
+    const d = await getJSON(`https://routing.openstreetmap.de/routed-${profile}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=false`, 6000);
     const r = d && d.routes && d.routes[0];
     return r ? { mins: Math.max(1, Math.round(r.duration / 60)), km: Math.round(r.distance / 100) / 10 } : null;
   }
@@ -61,8 +71,7 @@
   const kindOf = m => (TGO[m] === 'boat' ? 'Ferry' : TGO[m] === 'bus' ? 'Bus' : /SUBWAY|METRO/.test(m) ? 'Metro' : m === 'TRAM' ? 'Tram' : /CABLE|FUNICULAR|AERIAL/.test(m) ? 'Cable car' : 'Train');
   async function transit(a, b, when) {
     const qs = `fromPlace=${a[0]},${a[1]}&toPlace=${b[0]},${b[1]}&time=${encodeURIComponent(when.toISOString())}&numItineraries=3`;
-    let d = await getJSON(`https://api.transitous.org/api/v5/plan?${qs}`, 12000);
-    if (!d) d = await getJSON(`https://api.transitous.org/api/v4/plan?${qs}`, 12000, 1);
+    const d = await getJSON(`https://api.transitous.org/api/v5/plan?${qs}`, 9000, 1);
     const its = ((d && d.itineraries) || []).filter(it => (it.legs || []).some(l => l.mode && l.mode !== 'WALK')).sort((x, y) => x.duration - y.duration);
     if (!its.length) return null;
     const rides = its[0].legs.filter(l => l.mode !== 'WALK');
@@ -77,6 +86,7 @@
   }
   async function routeLeg(a, b, when) {
     const straight = hav(a, b);
+    if (late()) return estimate(a, b);
     if (straight < 0.12) return { go: 'walk', mins: 2, km: Math.round(straight * 10) / 10, line: 'Right next door' };
     const walk = straight < 6 ? await osrm('foot', a, b) : null;
     if (walk && walk.mins <= 25) return { go: 'walk', ...walk, line: `Walk ${walk.km} km` };
@@ -113,7 +123,8 @@
      dest: { name, country, ll }   ai(prompt) -> JSON (optional, for swapping in real places)
      onStep(i) is called as each stage starts. */
   async function makeReal(plan, dest, ai, onStep) {
-    const step = i => { try { onStep && onStep(i); } catch (e) { /* ignore */ } };
+    const step = i => { try { onStep && onStep(i); } catch (e) { /* ignore */ } LOG.push(['step', i]); };
+    LOG.length = 0; DEADLINE = Date.now() + 75000; // whole check stays under ~1.5 min
     const radius = 140;
     let center = dest.ll && isFinite(dest.ll[0]) ? dest.ll : null;
     if (!center) { const h = await lookup(`${dest.name} ${dest.country || ''}`.trim(), null, 1e9); if (h) center = h.ll; }
@@ -124,7 +135,7 @@
     const flat = []; days.forEach((d, i) => d.items.forEach(it => flat.push({ d: i, it })));
     await pool(flat, 3, async ({ d, it }) => {
       const dl = isFinite(+days[d].lat) && (+days[d].lat || +days[d].lon) ? [+days[d].lat, +days[d].lon] : null;
-      const near = dl && (!center || hav(center, dl) < radius) ? dl : center;
+      const near = dl || center; // multi-city trips: each day searches around its own area
       report.checked++;
       const h = await lookup(it.name, near, radius);
       if (h) { Object.assign(it, h, { ok: true }); report.found++; }
@@ -134,8 +145,8 @@
     if (missing.length && ai) {
       step(1);
       try {
-        const res = await ai(`These stops in a ${dest.name}${dest.country ? ', ' + dest.country : ''} itinerary could not be found on OpenStreetMap: ${missing.map((m, k) => `${k}. "${m.it.name}" (${m.it.cat}, day ${m.d + 1}: ${days[m.d].title || ''})`).join('; ')}.
-For each, give one real, well-known, currently operating place of the same kind in the same area, with its exact official name as it appears on maps. Reply with only JSON: {"r":[{"k":0,"name":""}]}`);
+        const res = await within(ai(`These stops in a ${dest.name}${dest.country ? ', ' + dest.country : ''} itinerary could not be found on OpenStreetMap: ${missing.map((m, k) => `${k}. "${m.it.name}" (${m.it.cat}, day ${m.d + 1}: ${days[m.d].title || ''})`).join('; ')}.
+For each, give one real, well-known, currently operating place of the same kind in the same area, with its exact official name as it appears on maps. Reply with only JSON: {"r":[{"k":0,"name":""}]}`), 30000);
         const alts = ((res && res.r) || []).filter(a => missing[a.k] && a.name);
         await pool(alts, 3, async a => {
           const m = missing[a.k];
@@ -178,9 +189,13 @@ For each, give one real, well-known, currently operating place of the same kind 
 
     step(3);
     const places = (plan.places || []).slice(0, 22).map(p => ({ ...p }));
-    await pool(places, 3, async p => { const h = await lookup(p.name, center, radius); if (h) Object.assign(p, h, { ok: true }); });
+    // most places are already on the day plan — reuse those lookups
+    const known = new Map(); days.forEach(d => d.items.forEach(it => { if (it.ok) known.set(fold(it.name), it); }));
+    DEADLINE = Math.max(DEADLINE, Date.now() + 15000);
+    await pool(places, 3, async p => { const k = known.get(fold(p.name)); if (k) { Object.assign(p, { ll: k.ll, addr: k.addr, osm: k.osm, ok: true }); return; } const h = await lookup(p.name, center, radius); if (h) Object.assign(p, h, { ok: true }); });
+    DEADLINE = Infinity;
     return { itinerary: days, places: places.filter(p => p.ok), center, report };
   }
 
-  window.WP_REAL = { makeReal, lookup, routeLeg };
+  window.WP_REAL = { makeReal, lookup, routeLeg, log: LOG };
 })();
