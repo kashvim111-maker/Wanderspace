@@ -17,9 +17,20 @@
   const LOG = [];
   let DEADLINE = Infinity; // after this, remaining legs use estimates instead of waiting on slow servers
   const late = () => Date.now() > DEADLINE;
+  // be gentle with the free servers: a few requests at a time per host (also keeps the browser's own queue short)
+  const HOSTMAX = { 'routing.openstreetmap.de': 2, 'api.transitous.org': 2, 'photon.komoot.io': 3, 'nominatim.openstreetmap.org': 1 };
+  const active = {}, waiting = {};
+  async function slot(host) {
+    const max = HOSTMAX[host] || 3; active[host] = active[host] || 0; waiting[host] = waiting[host] || [];
+    if (active[host] >= max) await new Promise(r => waiting[host].push(r));
+    active[host]++;
+    return () => { active[host]--; const n = waiting[host].shift(); if (n) n(); };
+  }
   async function getJSON(url, ms = 7000, tries = 2) {
+    const host = new URL(url).host;
     for (let k = 0; k < tries; k++) {
       if (late()) return null;
+      const release = await slot(host);
       const c = new AbortController(); const t0 = Date.now();
       try {
         const r = await within(fetch(url, { signal: c.signal, headers: { Accept: 'application/json' } }), ms);
@@ -27,6 +38,7 @@
         LOG.push([new URL(url).host, r.status]);
         if (r.status !== 429 && r.status < 500) return null;
       } catch (e) { LOG.push([new URL(url).host, 'timeout']); try { c.abort(); } catch (x) { /* ignore */ } }
+      finally { release(); }
       if (k < tries - 1) await sleep(600 * (k + 1));
     }
     return null;
@@ -71,6 +83,13 @@
     const r = d && d.routes && d.routes[0];
     return r ? { mins: Math.max(1, Math.round(r.duration / 60)), km: Math.round(r.distance / 100) / 10 } : null;
   }
+  // one request routes a whole day: legs[i] is stop i → stop i+1
+  async function osrmDay(profile, pts) {
+    if (pts.length < 2) return [];
+    const d = await getJSON(`https://routing.openstreetmap.de/routed-${profile}/route/v1/driving/${pts.map(p => `${p[1]},${p[0]}`).join(';')}?overview=false`, 9000);
+    const legs = d && d.routes && d.routes[0] && d.routes[0].legs;
+    return legs ? legs.map(l => ({ mins: Math.max(1, Math.round(l.duration / 60)), km: Math.round(l.distance / 100) / 10 })) : [];
+  }
   const TGO = { BUS: 'bus', COACH: 'bus', TROLLEYBUS: 'bus', FERRY: 'boat', ODM: 'car' };
   const kindOf = m => (TGO[m] === 'boat' ? 'Ferry' : TGO[m] === 'bus' ? 'Bus' : /SUBWAY|METRO/.test(m) ? 'Metro' : m === 'TRAM' ? 'Tram' : /CABLE|FUNICULAR|AERIAL/.test(m) ? 'Cable car' : 'Train');
   async function transit(a, b, when) {
@@ -88,13 +107,13 @@
     if (km < 1.6) return { go: 'walk', mins: Math.max(2, Math.round((km / 4.6) * 60)), km: Math.round(km * 10) / 10, est: true };
     return { go: 'car', mins: Math.round((km / (km > 40 ? 55 : 22)) * 60) + 5, km: Math.round(km * 10) / 10, est: true, line: 'Estimated — check locally' };
   }
-  async function routeLeg(a, b, when) {
+  async function routeLeg(a, b, when, pre) {
     const straight = hav(a, b);
     if (late()) return estimate(a, b);
     if (straight < 0.12) return { go: 'walk', mins: 2, km: Math.round(straight * 10) / 10, line: 'Right next door' };
-    const walk = straight < 6 ? await osrm('foot', a, b) : null;
+    const walk = pre && pre.walk !== undefined ? pre.walk : straight < 6 ? await osrm('foot', a, b) : null;
     if (walk && walk.mins <= 25) return { go: 'walk', ...walk, line: `Walk ${walk.km} km` };
-    const [pt, car] = await Promise.all([transit(a, b, when), osrm('car', a, b)]);
+    const [pt, car] = await Promise.all([transit(a, b, when), pre && pre.car !== undefined ? pre.car : osrm('car', a, b)]);
     const carMins = car ? car.mins + 6 : null; // + finding a cab / parking
     if (pt && (!carMins || pt.mins <= Math.max(carMins * 2.2, carMins + 25))) return { go: pt.go, mins: pt.mins, km: car ? car.km : walk ? walk.km : Math.round(straight * 13) / 10, line: pt.line };
     if (car) return { go: 'car', mins: carMins, km: car.km, line: straight > 60 ? 'Drive or intercity taxi — also check trains & buses locally' : 'Taxi or ride-hail' };
@@ -175,12 +194,16 @@ For each, give one real, well-known, currently operating place of the same kind 
       if (pts.length) { d.lat = pts.reduce((s, x) => s + x.ll[0], 0) / pts.length; d.lon = pts.reduce((s, x) => s + x.ll[1], 0) / pts.length; }
       let clock = toMin(items[0] && items[0].t); if (clock == null || clock < 360 || clock > 780) clock = 540;
       let travel = 0;
-      // route every leg of the day at once (departure time ≈ the plan's own time for that stop)
+      // walking & driving for the whole day in one request each, then public transport only where walking is too far
+      const geo = items.filter(x => x.ll), idx = new Map(geo.map((x, k) => [x, k]));
+      const [footL, carL] = late() ? [[], []] : await Promise.all([osrmDay('foot', geo.map(x => x.ll)), osrmDay('car', geo.map(x => x.ll))]);
       const legs = await Promise.all(items.map((it, j) => {
         const prev = items[j - 1];
         if (!j || !prev.ll || !it.ll) return null;
+        const k = idx.get(prev), adjacent = idx.get(it) === k + 1;
+        const pre = adjacent ? { walk: footL[k] || null, car: carL[k] || null } : null;
         const at = toMin(prev.t) ?? (clock + j * 110);
-        return routeLeg(prev.ll, it.ll, dayDate(it.ll[1], i, Math.min(Math.max(at + 60, 420), 1260)));
+        return routeLeg(prev.ll, it.ll, dayDate(it.ll[1], i, Math.min(Math.max(at + 60, 420), 1260)), pre);
       }));
       for (let j = 0; j < items.length; j++) {
         const it = items[j], prev = items[j - 1];
