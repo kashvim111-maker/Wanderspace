@@ -35,13 +35,17 @@
   const matches = (want, text) => { const have = new Set(tokens(text)); const n = want.filter(w => have.has(w)).length; return n > 0 && !(want.length >= 3 && n < 2); };
 
   /* ---------- OpenStreetMap lookup: Photon first, Nominatim as backup (1 request a second) ---------- */
-  let nomQ = Promise.resolve();
+  let nomQ = Promise.resolve(), photonFails = 0, photonOffUntil = 0;
   const nomSlot = () => (nomQ = nomQ.then(() => sleep(1100)));
   async function lookup(name, near, radius) {
     const want = tokens(name);
     if (!want.length) return null; // generic ("Sunset viewpoint") — not a named place
     const bias = near ? `&lat=${near[0]}&lon=${near[1]}&location_bias_scale=0.3&zoom=11` : '';
-    const d = await getJSON(`https://photon.komoot.io/api/?q=${encodeURIComponent(name)}&limit=6&lang=en${bias}`, 7000, 1);
+    let d = null;
+    if (Date.now() > photonOffUntil) {
+      d = await getJSON(`https://photon.komoot.io/api/?q=${encodeURIComponent(name)}&limit=6&lang=en${bias}`, 5000, 1);
+      if (d) photonFails = 0; else if (++photonFails >= 2) photonOffUntil = Date.now() + 120000; // busy — use Nominatim for a while
+    }
     for (const f of (d && d.features) || []) {
       const p = f.properties || {}, ll = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
       if (near && hav(near, ll) > radius) continue;
@@ -124,7 +128,7 @@
      onStep(i) is called as each stage starts. */
   async function makeReal(plan, dest, ai, onStep) {
     const step = i => { try { onStep && onStep(i); } catch (e) { /* ignore */ } LOG.push(['step', i]); };
-    LOG.length = 0; DEADLINE = Date.now() + 75000; // whole check stays under ~1.5 min
+    LOG.length = 0; DEADLINE = Date.now() + 60000; // lookups budget
     const radius = 140;
     let center = dest.ll && isFinite(dest.ll[0]) ? dest.ll : null;
     if (!center) { const h = await lookup(`${dest.name} ${dest.country || ''}`.trim(), null, 1e9); if (h) center = h.ll; }
@@ -137,11 +141,12 @@
       const dl = isFinite(+days[d].lat) && (+days[d].lat || +days[d].lon) ? [+days[d].lat, +days[d].lon] : null;
       const near = dl || center; // multi-city trips: each day searches around its own area
       report.checked++;
-      const h = await lookup(it.name, near, radius);
-      if (h) { Object.assign(it, h, { ok: true }); report.found++; }
+      if (late()) { it.unchecked = true; return; } // ran out of time: keep it, marked as not yet checked
+      const h = await lookup(it.name, near, dl ? 45 : radius);
+      if (h) { Object.assign(it, h, { ok: true }); report.found++; } else if (late()) it.unchecked = true;
     });
 
-    const missing = flat.filter(x => !x.it.ok && x.it.cat !== 'stay');
+    const missing = flat.filter(x => !x.it.ok && !x.it.unchecked && x.it.cat !== 'stay');
     if (missing.length && ai) {
       step(1);
       try {
@@ -151,27 +156,37 @@ For each, give one real, well-known, currently operating place of the same kind 
         await pool(alts, 3, async a => {
           const m = missing[a.k];
           const near = (days[m.d].items.find(x => x.ok) || {}).ll || center;
-          const h = await lookup(a.name, near, radius);
+          const h = await lookup(a.name, near, near === center ? radius : 45);
           if (h) { Object.assign(m.it, h, { name: String(a.name).slice(0, 140), ok: true, replaced: true }); report.replaced++; }
         });
       } catch (e) { /* keep going without swaps */ }
     }
 
     step(2);
+    DEADLINE = Date.now() + 50000; // routing budget; anything slower falls back to an estimate
     await pool(days.map((d, i) => [d, i]), 5, async ([d, i]) => {
       const real = d.items.filter(it => it.ok);
       const head = d.items[0] && !d.items[0].ok && d.items[0].cat === 'stay' ? [d.items[0]] : [];
-      report.dropped += d.items.length - real.length - head.length;
-      const items = [...head, ...orderStops(real)];
+      const unchecked = d.items.filter(it => it.unchecked && !it.ok && !head.includes(it));
+      report.dropped += d.items.length - real.length - head.length - unchecked.length;
+      report.unchecked = (report.unchecked || 0) + unchecked.length;
+      const items = [...head, ...orderStops(real), ...unchecked];
       const pts = items.filter(x => x.ll);
       if (pts.length) { d.lat = pts.reduce((s, x) => s + x.ll[0], 0) / pts.length; d.lon = pts.reduce((s, x) => s + x.ll[1], 0) / pts.length; }
       let clock = toMin(items[0] && items[0].t); if (clock == null || clock < 360 || clock > 780) clock = 540;
       let travel = 0;
+      // route every leg of the day at once (departure time ≈ the plan's own time for that stop)
+      const legs = await Promise.all(items.map((it, j) => {
+        const prev = items[j - 1];
+        if (!j || !prev.ll || !it.ll) return null;
+        const at = toMin(prev.t) ?? (clock + j * 110);
+        return routeLeg(prev.ll, it.ll, dayDate(it.ll[1], i, Math.min(Math.max(at + 60, 420), 1260)));
+      }));
       for (let j = 0; j < items.length; j++) {
         const it = items[j], prev = items[j - 1];
         if (j > 0 && prev.ll && it.ll) {
           report.legs++;
-          const leg = await routeLeg(prev.ll, it.ll, dayDate(it.ll[1], i, clock));
+          const leg = legs[j];
           if (!leg.est) report.routed++;
           Object.assign(it, { go: leg.go, mins: leg.mins, km: leg.km, line: leg.line || '', est: !!leg.est, real: !leg.est });
           clock += leg.mins; travel += leg.mins;
