@@ -1483,7 +1483,7 @@ Reply with only JSON in exactly this shape:
   /* ================================================================
      MEMORIES
      ================================================================ */
-  const realMems = () => Object.values(S.mems);
+  const realMems = () => Object.values(S.mems).filter(m => !m._hidden);
   const showingExamples = () => false;
   const allMems = () => (showingExamples() ? SEED.examples : realMems());
 
@@ -2324,14 +2324,26 @@ Reply with only a JSON array with one object per photo in the same order:
     $('#modal').innerHTML = `<div class="modal" data-tg="close" role="dialog" aria-modal="true" aria-label="Memories from ${esc(t.key)}"><div class="tgal glass-x">
       <div class="tg-head"><div><h3>${esc(t.folder ? t.folder.name : t.key)}${t.city ? `<em>${esc(t.city)}</em>` : ''}</h3><p>${items.length} ${items.length === 1 ? 'memory' : 'memories'}${t.folder && t.folder.start ? ' · ' + esc(fmtRange(t.folder.start, t.folder.end)) : ''}</p></div>
       <div class="tg-acts">${t.folder ? `<button class="btn btn-sm tg-btn" data-tg="upload"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Add photos & videos</button><button class="btn btn-sm tg-btn tg-alt" data-tg="edit">Edit trip</button>` : ''}<button class="icon-btn close" data-tg="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button></div></div>
-      <div class="tg-scroll"><div class="mosaic tg-mosaic" id="tgMosaic">${t.folder ? `<button class="mz upl" data-shape="sq" data-tg="upload"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Add photos & videos</b><small>Select loads at once, drop them here, or paste</small></button>` : ''}${items.map((m, k) => { const sh = SH[k % SH.length]; return `<button class="mz ${sh}" data-shape="${sh}" data-tg="open" data-id="${esc(m.id)}" aria-label="${esc(m.place || m.city || placeOf(m))}"><img src="${esc(memSrc(m))}" alt="" loading="lazy" draggable="false"><span class="pv-cap">${esc(m.place || m.city || placeOf(m))}</span></button>`; }).join('')}</div></div></div></div>`;
-    const box = $('#tgMosaic');
-    requestAnimationFrame(() => { layoutMosaic(box); mro.observe(box); });
+      <div class="tg-scroll">${items.length ? `<div class="tg-grid" id="tgMosaic">${items.map((m, k) => `<figure class="tg-it" style="--d:${Math.min(k, 14) * 0.04}s" data-id="${esc(m.id)}">${m.type === 'video' && m.url ? `<video src="${esc(m.url)}" muted loop playsinline autoplay preload="metadata"></video>` : `<img src="${esc(memSrc(m))}" alt="${esc(m.place || m.city || placeOf(m))}" loading="lazy" draggable="false">`}<button class="tg-x" data-tg="del" data-id="${esc(m.id)}" aria-label="Remove this ${m.type === 'video' ? 'video' : 'photo'}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></figure>`).join('')}</div>` : (t.folder ? `<button class="tg-drop" id="tgMosaic" data-tg="upload"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Add photos & videos</b><small>Select loads at once, drop them here, or paste</small></button>` : '')}</div></div></div>`;
+    requestAnimationFrame(() => document.querySelectorAll('.tg-it').forEach(f => f.classList.add('in')));
+  }
+  const PEND_DEL = new Map();
+  function removeFromGallery(id) {
+    const fig = document.querySelector(`.tg-it[data-id="${CSS.escape(id)}"]`);
+    if (fig) { fig.classList.add('gone'); setTimeout(() => fig.remove(), 450); }
+    const m = S.mems[id]; if (!m) return;
+    m._hidden = true; REEL.sig = ''; renderMem();
+    const left = document.querySelectorAll('.tg-it:not(.gone)').length;
+    const cnt = document.querySelector('.tg-head p'); if (cnt) cnt.textContent = cnt.textContent.replace(/^\d+ (memory|memories)/, `${left} ${left === 1 ? 'memory' : 'memories'}`);
+    const timer = setTimeout(async () => { PEND_DEL.delete(id); await deleteMem(id); REEL.sig = ''; renderMem(); }, 7000);
+    PEND_DEL.set(id, timer);
+    toast(`${m.type === 'video' ? 'Video' : 'Photo'} removed`, { label: 'Undo', fn: () => { clearTimeout(PEND_DEL.get(id)); PEND_DEL.delete(id); delete m._hidden; REEL.sig = ''; renderMem(); refreshGallery(); } });
+    if (!left) setTimeout(refreshGallery, 460);
   }
   $('#modal').addEventListener('click', ev => {
     const b = ev.target.closest('[data-tg]'); if (!b) return;
     if (b.dataset.tg === 'close') { if (b.classList.contains('modal') && ev.target !== b) return; REEL.gal = null; $('#modal').innerHTML = ''; }
-    if (b.dataset.tg === 'open') openLightbox(b.dataset.id);
+    if (b.dataset.tg === 'del') { ev.stopPropagation(); removeFromGallery(b.dataset.id); }
     if (b.dataset.tg === 'upload' && REEL.gal && REEL.gal.folder) pickFiles(REEL.gal.folder.name);
     if (b.dataset.tg === 'edit' && REEL.gal && REEL.gal.folder) { const fd = REEL.gal.folder; REEL.gal = null; openFolderDialog(fd); }
   });
