@@ -1356,6 +1356,15 @@ body{font-synthesis-weight:none}
 /* the strip paper always runs back up into the slot, even with one trip */
 #strip::before{content:"";position:absolute;left:0;right:0;bottom:calc(100% - 1px);height:300vh;background:#fffdf9;pointer-events:none}
 .reel.empty #strip::before{display:none}
+
+/* real-map checked stops */
+.leg em{font-style:normal;font-weight:500;opacity:.75;margin-left:4px;font-size:.9em}
+.leg.real{box-shadow:0 0 0 1.5px rgba(126,214,160,.9),0 6px 14px -8px rgba(0,0,0,.5)}
+.smap{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.88);color:#2a6b46;font:600 10.5px var(--f-body);text-decoration:none;pointer-events:auto;width:max-content}
+.smap:hover{background:#fff;color:#1d5236}
+.pmap{display:inline-flex;align-items:center;gap:4px;margin-top:6px;font:600 11.5px var(--f-body);color:#4a6fa5;text-decoration:none}
+.pmap:hover{text-decoration:underline}
+.jnote{display:block;margin-top:6px;padding:6px 10px;border-radius:10px;background:rgba(255,196,120,.9);color:#4a2c00;font:600 12px var(--f-body);max-width:420px}
 </style>
 </head>
 <body>
@@ -1464,6 +1473,7 @@ body{font-synthesis-weight:none}
 <script src="geo.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="supa.js"></script>
+<script src="realplan.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

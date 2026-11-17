@@ -764,7 +764,7 @@
     let go = it.go || ss.go, mins = it.mins || ss.mins;
     if (!go) { const n = it.name; go = /train|metro|rail/i.test(n) ? 'train' : /boat|ferry|cruise|catamaran/i.test(n) ? 'boat' : /drive|road|pass\b|jeep|taxi/i.test(n) ? 'car' : /bus/i.test(n) ? 'bus' : (j % 3 === 2 ? 'bus' : 'walk'); }
     if (!mins) mins = { walk: 12, bus: 25, train: 30, car: 40, boat: 45 }[go] + ((hash(it.name) % 4) * 5);
-    return { go, mins };
+    return { go, mins, line: it.line || '', km: it.km, real: !!it.real };
   }
   function placeImg(t, p) {
     if (p.img) return p.img;
@@ -888,7 +888,8 @@
       const a = all[j - 1], b = all[j], k = kink(a, b, j), g = stopGo(t, i, j - 1);
       total += g.mins;
       path += (path ? ' ' : '') + legPath(a, b, k);
-      chips += `<span class="leg" style="left:${k.x / 10}%;top:${k.y / 6}%;--d:${j}" title="${MODE_LABEL[g.go]} · ${fmtMins(g.mins)}">${ico(g.go, 13, 2.2)}<b>${fmtMins(g.mins)}</b></span>`;
+      const tip = [g.line || MODE_LABEL[g.go], fmtMins(g.mins), g.km ? g.km + ' km' : '', g.real ? 'real route' : 'estimate'].filter(Boolean).join(' · ');
+      chips += `<span class="leg${g.real ? ' real' : ''}" style="left:${k.x / 10}%;top:${k.y / 6}%;--d:${j}" title="${esc(tip)}">${ico(g.go, 13, 2.2)}<b>${fmtMins(g.mins)}</b>${g.real && g.km ? `<em>${g.km} km</em>` : ''}</span>`;
     }
     const cards = d.items.map((it, j) => {
       const p = pts[j], im = stopImg(t, i, j);
@@ -897,7 +898,7 @@
         <span class="sn">${j + 1}</span>
         <span class="sph">${im ? `<img src="${esc(im)}" alt="" loading="lazy" data-cat="${it.cat}" onerror="this.outerHTML=window.WPTILE(this.dataset.cat)">` : tile(it.cat)}</span>
         <span class="scat" title="${CAT_LABEL[it.cat] || ''}">${ico(it.cat, 13, 2)}</span>
-        <span class="slabel"><mark>${esc(it.name)}</mark>${it.t ? `<i>${esc(it.t)} · ${CAT_LABEL[it.cat] || ''}</i>` : ''}</span>
+        <span class="slabel"><mark>${esc(it.name)}</mark>${it.t ? `<i>${esc(it.t)} · ${CAT_LABEL[it.cat] || ''}</i>` : ''}${it.ok ? `<a class="smap" href="${esc(mapsUrl(it))}" target="_blank" rel="noopener" title="${esc(it.addr || 'Open in Google Maps')}">${ico('pin', 11, 2.2)}On the map ✓</a>` : ''}</span>
       </div>`;
     }).join('');
     return `<section class="jslide" data-slide="${i}" aria-label="Day ${i + 1}">
@@ -908,7 +909,7 @@
       ${start ? `<span class="jstart" style="left:${start.x / 10}%;top:${start.y / 6}%" title="Start from your stay"></span>` : ''}
       ${chips}${cards}
       ${!n ? `<div class="map-empty light"><h3>Nothing planned for this day</h3><button class="btn btn-white" data-act="panel" data-open="1">Add stops</button></div>` : ''}
-      <div class="jcap"><span class="mono">Day ${pad(i + 1)} of ${pad(t.itinerary.length)} · ${n} stops${total ? ' · ' + fmtMins(total) + ' getting around' : ''}</span><span class="nm">${esc(d.title)}</span></div>
+      <div class="jcap"><span class="mono">Day ${pad(i + 1)} of ${pad(t.itinerary.length)} · ${n} stops${total ? ' · ' + fmtMins(total) + ' getting around' : ''}${t.real ? ' · real routes · map data © OpenStreetMap contributors, Transitous' : ''}</span><span class="nm">${esc(d.title)}</span>${d.note ? `<span class="jnote">${esc(d.note)}</span>` : ''}</div>
     </section>`;
   }
   function overviewSlide(t) {
@@ -1020,7 +1021,7 @@
           <span class="pcat-b">${ico(p.cat, 13)}${CAT_LABEL[p.cat] || ''}</span>
           <button class="pdone" data-act="pdone2" data-i="${k}" aria-pressed="${!!p.done}" title="${p.done ? 'Visited' : 'Mark as visited'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
           <button class="pdel" data-act="delplace" data-i="${k}" aria-label="Remove ${esc(p.name)}">×</button></div>
-        <div class="pbody"><b>${esc(p.name)}</b><small>${esc([p.area, p.note].filter(Boolean).join(' · '))}</small></div></article>`; }).join('') || '<div class="empty-state">Save places here as you find them.</div>'}</div>
+        <div class="pbody"><b>${esc(p.name)}</b><small>${esc([p.area, p.note].filter(Boolean).join(' · '))}</small>${p.ok || p.ll ? `<a class="pmap" href="${esc(mapsUrl(p))}" target="_blank" rel="noopener">${ico('pin', 11, 2.2)}Open in Google Maps</a>` : ''}</div></article>`; }).join('') || '<div class="empty-state">Save places here as you find them.</div>'}</div>
       <form class="addrow" data-form="place" style="margin-top:18px"><input class="grow" name="name" placeholder="Add a place to visit" required aria-label="Place name"><input name="area" placeholder="Area" style="width:140px" aria-label="Area"><select name="cat" aria-label="Category">${catOptions('cafe')}</select><button class="btn btn-ghost btn-sm">Save place</button></form>`;
   }
   function checkHTML(t) {
@@ -1111,12 +1112,27 @@
   });
 
   /* Claude drafting */
+  // fields added when a stop has been checked on OpenStreetMap and its travel time routed
+  function realBits(x) {
+    const o = {};
+    if (Array.isArray(x.ll) && isFinite(+x.ll[0]) && isFinite(+x.ll[1])) o.ll = [+x.ll[0], +x.ll[1]];
+    if (x.ok) o.ok = true;
+    if (x.replaced) o.replaced = true;
+    if (x.real) o.real = true;
+    if (x.addr) o.addr = String(x.addr).slice(0, 160);
+    if (x.osm) o.osm = String(x.osm).slice(0, 40);
+    if (x.line) o.line = String(x.line).slice(0, 140);
+    if (+x.km >= 0 && x.km !== undefined && x.km !== null && x.km !== '') o.km = Math.round(+x.km * 10) / 10;
+    return o;
+  }
+  const mapsUrl = x => x.ll ? `https://www.google.com/maps/search/?api=1&query=${x.ll[0].toFixed(6)},${x.ll[1].toFixed(6)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(x.name)}`;
+  const osmUrl = x => (x.osm ? `https://www.openstreetmap.org/${x.osm}` : '');
   function cleanTrip(res) {
     const okCat = c => (CATS[c] ? c : 'see');
     const str = (s, n = 140) => String(s ?? '').slice(0, n);
     return {
-      itinerary: Array.isArray(res.itinerary) ? res.itinerary.slice(0, 30).map((d, i) => ({ title: str(d.title, 60) || `Day ${i + 1}`, ll: isFinite(+d.lat) && isFinite(+d.lon) && (+d.lat || +d.lon) ? [+d.lat, +d.lon] : null, items: (Array.isArray(d.items) ? d.items : []).slice(0, 10).map(it => ({ t: /^\d{1,2}:\d{2}$/.test(it.t) ? it.t.padStart(5, '0') : '', name: str(it.name), cat: okCat(it.cat), go: ['walk', 'bus', 'train', 'car', 'boat'].includes(it.go) ? it.go : undefined, mins: +it.mins > 0 && +it.mins < 900 ? Math.round(+it.mins) : undefined })) })) : [],
-      places: Array.isArray(res.places) ? res.places.slice(0, 40).map(p => ({ cat: okCat(p.cat), name: str(p.name), area: str(p.area, 60), note: str(p.note, 80), done: false })) : [],
+      itinerary: Array.isArray(res.itinerary) ? res.itinerary.slice(0, 30).map((d, i) => ({ title: str(d.title, 60) || `Day ${i + 1}`, ll: isFinite(+d.lat) && isFinite(+d.lon) && (+d.lat || +d.lon) ? [+d.lat, +d.lon] : null, items: (Array.isArray(d.items) ? d.items : []).slice(0, 10).map(it => ({ t: /^\d{1,2}:\d{2}$/.test(it.t) ? it.t.padStart(5, '0') : '', name: str(it.name), cat: okCat(it.cat), go: ['walk', 'bus', 'train', 'car', 'boat'].includes(it.go) ? it.go : undefined, mins: +it.mins > 0 && +it.mins < 900 ? Math.round(+it.mins) : undefined, ...realBits(it) })), ...(d.note ? { note: str(d.note, 160) } : {}) })) : [],
+      places: Array.isArray(res.places) ? res.places.slice(0, 40).map(p => ({ cat: okCat(p.cat), name: str(p.name), area: str(p.area, 60), note: str(p.note, 80), done: false, ...realBits(p) })) : [],
       checklist: Array.isArray(res.checklist) ? res.checklist.slice(0, 12).map(c => ({ t: str(typeof c === 'string' ? c : c.t, 100), done: false })) : [],
     };
   }
@@ -1332,6 +1348,13 @@ Reply with only JSON in exactly this shape:
     if (claudeReady()) {
       try {
         const res = await caps.sample.json(planPrompt(t), { modelTier: 'default' });
+        if (window.WP_REAL && res && Array.isArray(res.itinerary)) {
+          PLAN_AT = 2;
+          try {
+            const v = await window.WP_REAL.makeReal({ itinerary: res.itinerary, places: res.places }, { name: t.name, country: t.country || res.country || '', ll: t.ll }, p => caps.sample.json(p), s => { PLAN_AT = 2 + s; });
+            if (v.itinerary.some(d => d.items.length)) { res.itinerary = v.itinerary; res.places = v.places; t.real = { ...v.report, at: new Date().toISOString().slice(0, 10) }; if (!t.ll && v.center) t.ll = v.center; }
+          } catch (e) { /* keep the unchecked plan */ }
+        }
         const c = cleanTrip(res || {}); if (!c.itinerary.length) throw {};
         Object.assign(t, c);
         t.precautions = Array.isArray(res.precautions) ? res.precautions.slice(0, 8).map(x => String(x).slice(0, 120)) : [];
@@ -1348,7 +1371,7 @@ Reply with only JSON in exactly this shape:
     for (let i = t.itinerary.length; i < t.days; i++) t.itinerary.push({ title: `Day ${i + 1} — your plan`, ll: null, items: [], own: true });
     const have = new Set((t.places || []).map(p => p.name.toLowerCase()));
     t.places = t.places || [];
-    t.itinerary.forEach((d, i) => d.items.forEach(it => { if (it.cat !== 'stay' && !have.has(it.name.toLowerCase())) { have.add(it.name.toLowerCase()); t.places.push({ cat: it.cat, name: it.name, area: d.title, note: `On day ${i + 1}`, done: false }); } }));
+    t.itinerary.forEach((d, i) => d.items.forEach(it => { if (it.cat !== 'stay' && !have.has(it.name.toLowerCase())) { have.add(it.name.toLowerCase()); t.places.push({ cat: it.cat, name: it.name, area: d.title, note: `On day ${i + 1}`, done: false, ...realBits(it) }); } }));
     findImages(t);
   }
   /* photos for every stop and place: Wikipedia's free image search (works on the hosted site; blocked inside Claude artifacts) */
@@ -1375,10 +1398,13 @@ Reply with only JSON in exactly this shape:
     (t.places || []).forEach(p => { if (!p.img) { const im = placeImg(t, p); if (im) p.img = im; } if (p.img) found++; });
     if (found) { tripChanged(t); persist('trips'); if (IT.id === t.id && IT.mode === 'plan') renderItin(); }
   }
-  const PLAN_STEPS = n => [`Finding ${n} on the map`, 'Planning each day', 'Drawing the route between stops', 'Picking places to visit', 'Writing your checklist & precautions', 'Stamping your passport'];
+  let PLAN_AT = 0;
+  const PLAN_STEPS = n => window.WP_REAL
+    ? [`Researching ${n}`, 'Planning each day', 'Checking every stop exists on OpenStreetMap', 'Swapping in real places where needed', 'Working out real walking, transit & taxi times', 'Checking places to visit', 'Stamping your passport']
+    : [`Finding ${n} on the map`, 'Planning each day', 'Drawing the route between stops', 'Picking places to visit', 'Writing your checklist & precautions', 'Stamping your passport'];
   function renderPlanning(t, done = 0) {
     const box = $('.np-form'); if (!box) return;
-    box.innerHTML = `<div><h3>Planning ${esc(t.name)}</h3><p class="lead">${t.days} days${t.country ? ' · ' + esc(t.country) : ''}${claudeReady() ? ' · with Claude' : ''}</p></div>
+    box.innerHTML = `<div><h3>Planning ${esc(t.name)}</h3><p class="lead">${t.days} days${t.country ? ' · ' + esc(t.country) : ''}${claudeReady() ? (window.WP_REAL ? ' · checked against real maps — this takes about a minute' : ' · with Claude') : ''}</p></div>
       <ol class="np-steps">${PLAN_STEPS(t.name).map((s, i) => `<li class="${i < done ? 'ok' : i === done ? 'now' : ''}"><i></i>${esc(s)}</li>`).join('')}</ol>`;
   }
   async function submitNamePhoto() {
@@ -1394,11 +1420,13 @@ Reply with only JSON in exactly this shape:
     else { const [x, y] = AD.at || viewCenter(); S.els.push({ id: rid('e'), kind: 'trip', tripId: id, x, y, rot: 0, scale: 1, w: 250, ar: 1.3 }); }
     persist('trips'); persist('board'); renderWorld();
     renderPlanning(t, 0);
-    let step = 0; const timer = setInterval(() => { if (step < 4) renderPlanning(t, ++step); }, 1100);
+    let step = 0; PLAN_AT = 0;
+    const real = !!window.WP_REAL, last = PLAN_STEPS('').length;
+    const timer = setInterval(() => { const cap = real ? Math.max(1, PLAN_AT) : 4; if (step < cap) renderPlanning(t, ++step); }, real ? 900 : 1100);
     const ai = await planTrip(t);
     finishPlan(t);
     clearInterval(timer);
-    for (let s = step + 1; s <= 6; s++) { renderPlanning(t, s); await new Promise(r => setTimeout(r, 450)); }
+    for (let s = step + 1; s <= last; s++) { renderPlanning(t, s); await new Promise(r => setTimeout(r, 350)); }
     tripChanged(t); persist('trips'); renderWorld(); select(S.els.find(e => e.tripId === id)?.id || null);
     if (local) toast('Your photo shows for this visit only — photo saving isn’t available here.');
     else if (!ai) toast(claudeReady() ? 'Claude couldn’t plan this one, so here’s a starter plan to edit.' : 'Here’s a starter plan — edit any day in the planner.');
