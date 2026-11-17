@@ -168,6 +168,13 @@
       if (h) { Object.assign(it, h, { ok: true }); report.found++; } else if (late()) it.unchecked = true;
     });
 
+    // a stop far away from the rest of its day was probably matched to a same-named place elsewhere
+    days.forEach(d => {
+      const f = d.items.filter(x => x.ok); if (f.length < 3) return;
+      const c = [f.reduce((s, x) => s + x.ll[0], 0) / f.length, f.reduce((s, x) => s + x.ll[1], 0) / f.length];
+      const ds = f.map(x => hav(c, x.ll)).sort((p, q) => p - q), med = ds[Math.floor(ds.length / 2)];
+      f.forEach(x => { const dd = hav(c, x.ll); if (dd > 6 && dd > med * 3) { x.ok = false; delete x.ll; report.found--; } });
+    });
     const missing = flat.filter(x => !x.it.ok && !x.it.unchecked && x.it.cat !== 'stay');
     if (missing.length && ai) {
       step(1);
