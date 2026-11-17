@@ -232,6 +232,12 @@
     },
   };
 
+  /* product requests: paid plan, feature ideas, limit hits */
+  window.WP_FEEDBACK = async (kind, message, context) => {
+    const { error } = await SB.from('requests').insert({ kind, message: message ? String(message).slice(0, 2000) : null, context: context || null });
+    if (error) throw error;
+  };
+
   window.claude = {
     async use(name) {
       const s = await sessionP, uid = s.user.id;

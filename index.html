@@ -1365,6 +1365,25 @@ body{font-synthesis-weight:none}
 .pmap{display:inline-flex;align-items:center;gap:4px;margin-top:6px;font:600 11.5px var(--f-body);color:#4a6fa5;text-decoration:none}
 .pmap:hover{text-decoration:underline}
 .jnote{display:block;margin-top:6px;padding:6px 10px;border-radius:10px;background:rgba(255,196,120,.9);color:#4a2c00;font:600 12px var(--f-body);max-width:420px}
+
+/* plan notes + free-plan limit */
+.pl-notes{position:relative;z-index:3;margin:0 20px 10px;padding:12px 16px;border-radius:16px;background:linear-gradient(150deg,rgba(255,255,255,.62),rgba(255,255,255,.4));border:1px solid rgba(255,255,255,.8);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);color:#2a2438;font-size:13px;max-height:30vh;overflow:auto}
+.pl-notes-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.pl-notes-h b{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.pl-notes ul{margin:0;padding:0 0 0 18px;display:grid;gap:5px;line-height:1.45}
+.pl-notes li::marker{color:#8b78c4}
+.pl-notes li.nt-limit,.pl-notes li.nt-ai{color:#7a3b12}
+.pl-notes-a{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pl-notes-pill{position:relative;z-index:3;margin:0 20px 10px;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.8);background:rgba(255,255,255,.5);backdrop-filter:blur(14px);color:#2a2438;font:600 12.5px var(--f-body);cursor:pointer}
+.limdlg{width:min(520px,94vw)}
+.lim-badge{display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(196,178,255,.35);border:1px solid rgba(255,255,255,.8);font:700 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:#4d3d80;margin-bottom:10px}
+.lim-ok{margin:0 0 16px;padding:10px 12px;border-radius:12px;background:rgba(126,214,160,.22);border:1px solid rgba(255,255,255,.7);font-size:13.5px;color:#1f4a33}
+.lim-opts{display:grid;gap:10px;margin-bottom:14px}
+.lim-opt{display:grid;gap:3px;text-align:left;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.42);backdrop-filter:blur(12px);cursor:pointer;color:#231d33;font-family:var(--f-body);transition:background .25s,transform .25s}
+.lim-opt:hover{background:rgba(255,255,255,.75);transform:translateY(-1px)}
+.lim-opt b{font-size:15px}.lim-opt small{color:#5d5470;font-size:12.5px;line-height:1.4}
+.lim-more{display:grid;gap:8px;margin-bottom:12px}.lim-more textarea{width:100%;box-sizing:border-box;padding:10px 12px;font:500 14px var(--f-body);resize:vertical}
+.lim-more .btn{justify-self:end}
 </style>
 </head>
 <body>

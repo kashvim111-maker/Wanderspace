@@ -118,10 +118,11 @@
     if (walk && walk.mins <= 25) return { go: 'walk', ...walk, line: `Walk ${walk.km} km` };
     const [pt, car] = await Promise.all([transit(a, b, when), pre && pre.car !== undefined ? pre.car : osrm('car', a, b)]);
     const carMins = car ? car.mins + 6 : null; // + finding a cab / parking
-    if (pt && (!carMins || pt.mins <= Math.max(carMins * 2.2, carMins + 25))) return { go: pt.go, mins: pt.mins, km: car ? car.km : walk ? walk.km : Math.round(straight * 13) / 10, line: pt.line };
-    if (car) return { go: 'car', mins: carMins, km: car.km, line: straight > 60 ? 'Drive or intercity taxi — also check trains & buses locally' : 'Taxi or ride-hail' };
-    if (walk) return { go: 'walk', ...walk, line: `Walk ${walk.km} km` };
-    return estimate(a, b);
+    const f = { ptTried: true, ptFound: !!pt };
+    if (pt && (!carMins || pt.mins <= Math.max(carMins * 2.2, carMins + 25))) return { go: pt.go, mins: pt.mins, km: car ? car.km : walk ? walk.km : Math.round(straight * 13) / 10, line: pt.line, ...f };
+    if (car) return { go: 'car', mins: carMins, km: car.km, line: straight > 60 ? 'Drive or intercity taxi — also check trains & buses locally' : pt ? 'Taxi or ride-hail (faster than public transport here)' : 'Taxi or ride-hail', ...f };
+    if (walk) return { go: 'walk', ...walk, line: `Walk ${walk.km} km`, ...f };
+    return { ...estimate(a, b), ...f };
   }
 
   /* ---------- day building ---------- */
@@ -221,6 +222,8 @@ For each, give one real, well-known, currently operating place of the same kind 
           report.legs++;
           const leg = legs[j];
           if (!leg.est) report.routed++;
+          if (leg.ptTried) report.ptTried = (report.ptTried || 0) + 1;
+          if (leg.ptFound) report.ptFound = (report.ptFound || 0) + 1;
           Object.assign(it, { go: leg.go, mins: leg.mins, km: leg.km, line: leg.line || '', est: !!leg.est, real: !leg.est });
           clock += leg.mins; travel += leg.mins;
         } else if (j === 0) { it.go = it.go || 'walk'; it.mins = it.mins || 15; it.est = true; it.real = false; it.line = 'From where you stay'; }

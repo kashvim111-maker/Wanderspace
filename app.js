@@ -737,6 +737,7 @@
 
   /* --- planner --- */
   const ICON = {
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
     eat: '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-2 6 0 8v10"/>',
     cafe: '<path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9zM16 10h2a2.5 2.5 0 0 1 0 5h-2M8 3v3M12 3v3"/>',
     temple: '<path d="M3 21h18M4 10h16M12 3l9 5H3l9-5zM6 10v8M10 10v8M14 10v8M18 10v8"/>',
@@ -797,7 +798,7 @@
         <div class="pl-title"><span class="nm">${esc(t.name)}</span><span class="mono">${esc(t.country)} · ${t.days} days · ${fmtMonth(t.target)} · <b class="st-${t.status}">${t.status}</b></span></div>
         <nav class="pl-tabs" role="tablist">${tabs.map(([k, n]) => `<button class="pl-tab" role="tab" data-act="tab" data-v="${k}" aria-selected="${IT.tab === k}">${n}</button>`).join('')}</nav>
         <div class="pl-actions">
-          <button class="btn btn-lilac btn-sm" data-act="draft" ${claudeReady() && !IT.busy ? '' : 'disabled'} title="${claudeReady() ? '' : 'Claude isn’t available in this view'}"><svg width="13" height="13" viewBox="0 0 60 60"><path d="M30 2 L36 24 L58 30 L36 36 L30 58 L24 36 L2 30 L24 24Z" fill="currentColor"/></svg>${has ? 'Redraft with Claude' : 'Draft with Claude'}</button>
+          <button class="btn btn-lilac btn-sm" data-act="draft" ${claudeReady() && !IT.busy ? '' : 'disabled'} title="${claudeReady() ? '' : 'Claude isn’t available in this view'}"><svg width="13" height="13" viewBox="0 0 60 60"><path d="M30 2 L36 24 L58 30 L36 36 L30 58 L24 36 L2 30 L24 24Z" fill="currentColor"/></svg>${window.WP_REAL ? (has ? 'Replan with AI' : 'Plan with AI') : has ? 'Redraft with Claude' : 'Draft with Claude'}</button>
           <div class="menu-wrap"><button class="icon-btn" data-act="menu" aria-label="Trip options" aria-expanded="${!!IT.menu}">${ico('more', 16)}</button>
             ${IT.menu ? `<div class="pl-menu" role="menu">
               <div class="mono" style="padding:6px 12px 4px;color:var(--ink-3)">Status</div>
@@ -810,10 +811,18 @@
       </header>
       ${IT.confirm ? `<div class="pl-note confirm">This replaces the current days and places. <button class="btn btn-dark btn-sm" data-act="draftGo">Redraft</button><button class="btn btn-ghost btn-sm" data-act="draftCancel">Keep mine</button></div>` : ''}
       ${IT.err ? `<div class="pl-note err">${esc(IT.err)}</div>` : ''}
+      ${notesHTML(t)}
       <div class="pl-body">${planBody(t)}</div>
       ${IT.edit ? `<div class="pl-pop" data-act="editClose"><div class="pl-pop-card" role="dialog" aria-label="Trip details">${basicsHTML(t)}<div class="actions"><button class="btn btn-dark btn-sm" data-act="editClose">Done</button></div></div></div>` : ''}
     </div></div>`;
     if (IT.tab === 'route' && !IT.busy) wireJourney(t);
+  }
+  function notesHTML(t) {
+    const n = planNotes(t); if (!n.length || IT.busy) return '';
+    if (t.notesHidden) return `<button class="pl-notes-pill" data-act="notesShow">${ico('info', 13, 2.2)}${n.length} ${n.length === 1 ? 'thing' : 'things'} to know about this plan</button>`;
+    return `<div class="pl-notes" role="note"><div class="pl-notes-h"><b>${ico('info', 14, 2.2)}About this plan</b><button class="link" data-act="notesHide">Hide</button></div>
+      <ul>${n.map(([k, s]) => `<li class="nt-${k}">${esc(s)}${k === 'limit' || k === 'ai' ? '' : ''}</li>`).join('')}</ul>
+      ${n.some(([k]) => k === 'limit') ? `<div class="pl-notes-a"><button class="btn btn-ghost btn-sm" data-act="reqPaid">Request a paid plan</button><button class="btn btn-ghost btn-sm" data-act="reqMore">Suggest a feature</button></div>` : ''}</div>`;
   }
   function planBody(t) {
     if (IT.busy) return `<div class="sheet center"><div class="thinking"><span class="spin"></span>Claude is drafting ${t.days} days in ${esc(t.name)} — real cafés, temples, museums and things to do, with how to get between them…</div></div>`;
@@ -931,7 +940,7 @@
   }
   function routeHTML(t) {
     const days = t.itinerary || [];
-    if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(coverSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? '<button class="btn btn-lilac" data-act="draft">Draft with Claude</button>' : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
+    if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(coverSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? `<button class="btn btn-lilac" data-act="draft">${window.WP_REAL ? 'Plan with AI' : 'Draft with Claude'}</button>` : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
     const N = days.length + 1, cur = clamp(IT.day, 0, N - 1);
     return `<div class="journey" tabindex="-1">
       <div class="jtrack" style="transform:translateY(${-cur * 100}%)">${days.map((_, i) => daySlide(t, i)).join('')}${overviewSlide(t)}</div>
@@ -1075,6 +1084,9 @@
     if (act === 'delck') { t.checklist.splice(+b.dataset.i, 1); tripChanged(t, false); return renderItin(); }
     if (act === 'draft') { if ((t.itinerary || []).length || (t.places || []).length) { IT.confirm = true; return renderItin(); } return draftTrip(t); }
     if (act === 'draftGo') { IT.confirm = false; return draftTrip(t); }
+    if (act === 'notesHide') { t.notesHidden = true; tripChanged(t); return renderItin(); }
+    if (act === 'notesShow') { t.notesHidden = false; tripChanged(t); return renderItin(); }
+    if (act === 'reqPaid' || act === 'reqMore') { return openLimit('limit', null); }
     if (act === 'draftCancel') { IT.confirm = false; return renderItin(); }
     if (act === 'visited') {
       t.status = 'visited'; tripChanged(t); closeModal();
@@ -1138,6 +1150,18 @@
   }
   async function draftTrip(t) {
     if (!caps.sample) return;
+    if (window.WP_REAL) {
+      if (limited()) return openLimit('limit', null);
+      IT.busy = true; IT.err = ''; IT.tab = 'route'; IT.day = 0; renderItin();
+      const keep = { itinerary: t.itinerary, places: t.places, real: t.real };
+      try { await planTrip(t, true); finishPlan(t); if (t.status === 'dreaming') t.status = 'planning'; tripChanged(t); }
+      catch (e) {
+        Object.assign(t, keep);
+        if (e && (e.code === 'rate_limited' || e.code === 'limit')) { IT.busy = false; return openLimit(e.code === 'limit' ? 'limit' : 'busy', null); }
+        IT.err = e && e.code === 'not_granted' ? 'AI planning isn’t set up on this site yet.' : 'Couldn’t plan this one right now. Try again in a minute, or add stops yourself.';
+      }
+      IT.busy = false; if (S.trips[t.id] && IT.id === t.id) renderItin(); return;
+    }
     IT.busy = true; IT.err = ''; IT.tab = 'route'; IT.day = 0; renderItin();
     const prompt = `Plan a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.region ? ` (areas: ${t.region})` : ''}${t.target ? `, travelling around ${fmtMonth(t.target).toLowerCase()}` : ''}. The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.
 Use real, currently operating places only — specific named cafés, restaurants, temples, museums, viewpoints, nature spots and experiences. Group each day geographically so it is walkable or a short ride.
@@ -1251,7 +1275,7 @@ Reply with only JSON in exactly this shape:
         <div class="np-mapwrap ${AD.mode === 'map' ? 'live' : ''}"><div class="np-map" id="npMap">${MAPSVG()}</div>
           <div class="np-maptools">${AD.mode === 'map' ? '<button type="button" data-ad="zin" aria-label="Zoom in">+</button><button type="button" data-ad="zout" aria-label="Zoom out">−</button>' : ''}<span class="np-picked" id="npPicked">${AD.mode === 'map' ? (AD.name ? `📍 ${esc(AD.name)}${AD.country ? ', ' + esc(AD.country) : ''}` : 'Click anywhere to drop a pin · scroll to zoom · drag to move') : (AD.ll ? `📍 ${esc(AD.name)}` : 'The map follows what you type')}</span></div></div>
         <div class="row" style="grid-template-columns:1.6fr 1fr"><label>Country<input type="text" name="country" value="${esc(AD.country)}" placeholder="Portugal"></label><label>Number of days<input type="number" name="days" min="1" max="30" value="${AD.days}" required></label></div>
-        <p class="np-note">We plan up to the first 5 days for you — any extra days are yours to fill in the planner.</p>
+        <p class="np-note">We plan up to the first 5 days for you — any extra days are yours to fill in the planner.${window.WP_REAL ? ` Every stop is checked on a real map, so planning takes about a minute. Free plan: ${PLAN_LIMIT} AI plans a day${plansToday() ? ` (${Math.max(0, PLAN_LIMIT - plansToday())} left today)` : ''}.` : ''}</p>
         <div class="actions"><button type="button" class="btn btn-ghost" data-ad="close">Cancel</button><button class="btn btn-dark np-go"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.7z" fill="currentColor"/></svg>Plan my trip</button></div>
       </form></div></div>`;
     if (AD.mode === 'map' && AD.name) { const f = $('#adForm'); if (!f.querySelector('input[type=hidden][name=name]')) f.insertAdjacentHTML('beforeend', `<input type="hidden" name="name" value="${esc(AD.name)}">`); }
@@ -1344,7 +1368,70 @@ Reply with only JSON in exactly this shape:
       checklist: ['Check visa & entry rules', 'Book flights and first two nights', 'Travel insurance', 'Local SIM or eSIM', 'Download offline maps'].map(x => ({ t: x, done: false })),
       precautions: ['Keep digital and paper copies of ID', 'Check the weather and pack layers', 'Carry some local cash for small shops', 'Respect dress codes at religious sites'] };
   }
-  async function planTrip(t) {
+  /* ---------- free-plan limits & honest notes about each plan ---------- */
+  const PLAN_LIMIT = 3; // AI trip plans per person per day on the free plan (live site)
+  const todayKey = () => new Date().toISOString().slice(0, 10);
+  const plansToday = () => { const l = S.prefs.planLog || {}; return l.d === todayKey() ? l.n || 0 : 0; };
+  const countPlan = () => { S.prefs.planLog = { d: todayKey(), n: plansToday() + 1 }; persist('prefs'); };
+  const limited = () => !!window.WP_REAL && plansToday() >= PLAN_LIMIT;
+  async function sendRequest(kind, message, context) {
+    try {
+      if (window.WP_FEEDBACK) await window.WP_FEEDBACK(kind, message, context);
+      else { S.prefs.requests = (S.prefs.requests || []).concat({ kind, message, at: new Date().toISOString() }).slice(-20); persist('prefs'); }
+      return true;
+    } catch (e) { return false; }
+  }
+  function openLimit(reason, t) {
+    const why = reason === 'busy'
+      ? 'The free AI we use is busy or has run out of requests for today, so we couldn’t plan this trip right now.'
+      : `You’ve made ${plansToday()} AI trip plans today — that’s the free limit. It resets tomorrow.`;
+    sendRequest('limit_hit', null, { reason, trip: t ? t.name : null });
+    $('#modal').innerHTML = `<div class="modal" data-lim="close" role="dialog" aria-modal="true" aria-label="Free planning limit reached"><div class="dialog limdlg">
+      <button class="icon-btn close" data-lim="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
+      <span class="lim-badge">Free plan</span>
+      <h3>${reason === 'busy' ? 'Planning is paused for now' : 'You’ve reached today’s planning limit'}</h3>
+      <p class="lead">${why} Wander Passport runs on free AI and free, community-run map services, which only allow a few checked plans per person each day.</p>
+      ${t ? `<p class="lim-ok">${esc(t.name)} is saved on your board with ${t.days} empty days — you can fill them in yourself now, or come back tomorrow and press <b>Plan with AI</b> in its planner.</p>` : ''}
+      <div class="lim-opts">
+        <button class="lim-opt" data-lim="paid"><b>Request a paid plan</b><small>More plans a day, faster checks and public-transport times. Tell us you’d use it.</small></button>
+        <button class="lim-opt" data-lim="more"><b>I’d like this built further</b><small>Liked it? Tell us what to build next.</small></button>
+      </div>
+      <form class="lim-more" id="limMore" hidden><textarea name="m" rows="3" maxlength="2000" placeholder="What would make Wander Passport better for you?"></textarea><button class="btn btn-dark btn-sm">Send</button></form>
+      <div class="actions"><button class="btn btn-ghost" data-lim="close">${t ? 'Open my trip' : 'Got it'}</button></div>
+    </div></div>`;
+    const done = () => { const id = t && t.id; closeModal(); if (id && S.trips[id]) openPassport(id); };
+    $('#modal').onclick = async ev => {
+      const b = ev.target.closest('[data-lim]'); if (!b) return;
+      if (b.classList.contains('modal') && ev.target !== b) return;
+      const k = b.dataset.lim;
+      if (k === 'close') { $('#modal').onclick = null; done(); }
+      if (k === 'paid') { b.disabled = true; const ok = await sendRequest('paid_plan', null, { from: reason }); b.innerHTML = ok ? '<b>Request sent ✓</b><small>Thanks — we’ll let you know when a paid plan is ready.</small>' : '<b>Couldn’t send</b><small>Check your connection and try again.</small>'; if (!ok) b.disabled = false; }
+      if (k === 'more') { $('#limMore').hidden = false; $('#limMore textarea').focus(); }
+    };
+    $('#limMore').onsubmit = async ev => {
+      ev.preventDefault(); const m = ev.target.m.value.trim(); if (!m) return;
+      const ok = await sendRequest('feature', m, { from: reason });
+      ev.target.innerHTML = `<p class="lim-ok">${ok ? 'Thank you — your idea has been sent.' : 'Couldn’t send — try again later.'}</p>`;
+    };
+  }
+  // honest notes about what this plan could and couldn't check
+  function planNotes(t) {
+    const n = [], r = t.real;
+    if (t.limitHit) n.push(['limit', 'AI planning wasn’t available when you added this trip, so the days are empty. Press “Plan with AI” to try again, or fill them in yourself.']);
+    else if (t.starter) n.push(['ai', 'This is a starter outline — AI planning wasn’t available, so the stops are placeholders, not real places. Edit them or try “Plan with AI” again later.']);
+    if (r) {
+      if (r.checked && r.found + (r.replaced || 0) < r.checked * 0.6) n.push(['remote', `This area isn’t well covered by the open map we use: we could only confirm ${r.found + (r.replaced || 0)} of ${r.checked} suggested places, so the days are shorter. Remote and rural places often have little map data — check a local guide too.`]);
+      else if (r.dropped) n.push(['dropped', `We left out ${r.dropped} suggested ${r.dropped === 1 ? 'place' : 'places'} we couldn’t find on the map, so nothing here is made up.`]);
+      if (r.ptTried && !r.ptFound) n.push(['transit', 'Public-transport timetables aren’t available for this area in the free data we use, so longer hops show as taxi or ride-hail. Buses and trains may still run — ask locally.']);
+      const est = (r.legs || 0) - (r.routed || 0);
+      if (est > 0) n.push(['est', `${est} travel ${est === 1 ? 'time is an estimate' : 'times are estimates'} because the free map servers were busy — real routes have a green ring.`]);
+      if (r.unchecked) n.push(['unchecked', `${r.unchecked} ${r.unchecked === 1 ? 'stop' : 'stops'} couldn’t be checked in time — look ${r.unchecked === 1 ? 'it' : 'them'} up before you go.`]);
+    } else if (!t.starter && !t.limitHit && (t.itinerary || []).some(d => d.items.length && !d.own) && !window.WP_REAL) n.push(['preview', 'Places and travel times in this preview aren’t checked against real maps. The live site checks every stop.']);
+    if (t.days > 5 && (t.itinerary || []).some(d => d.own)) n.push(['days', `We plan the first 5 days; days 6–${t.days} are yours to fill in.`]);
+    return n;
+  }
+  async function planTrip(t, strict) {
+    if (window.WP_REAL && limited()) { if (strict) throw { code: 'limit' }; t.limitHit = true; return false; }
     if (claudeReady()) {
       try {
         const res = await caps.sample.json(planPrompt(t), { modelTier: 'default' });
@@ -1360,9 +1447,16 @@ Reply with only JSON in exactly this shape:
         t.precautions = Array.isArray(res.precautions) ? res.precautions.slice(0, 8).map(x => String(x).slice(0, 120)) : [];
         ['country', 'region', 'season', 'budget', 'tagline', 'airport'].forEach(k => { if (res[k]) t[k] = String(res[k]).slice(0, 120); });
         if (res.countryCode) t.cc = String(res.countryCode).slice(0, 2).toUpperCase();
+        delete t.starter; delete t.limitHit; delete t.notesHidden;
+        if (window.WP_REAL) countPlan();
         return true;
-      } catch (e) { if (e && e.code === 'not_granted') caps.sample = null; }
+      } catch (e) {
+        if (e && e.code === 'not_granted') caps.sample = null;
+        if (e && e.code === 'rate_limited') { if (strict) throw e; t.limitHit = true; t.limitBusy = true; return false; }
+        if (strict) throw e;
+      }
     }
+    if (window.WP_REAL) { t.limitHit = !claudeReady(); if (!t.limitHit) { Object.assign(t, starterPlan(t)); t.starter = true; } return false; } // live site: never show placeholder places as if real
     Object.assign(t, starterPlan(t)); t.starter = true;
     return false;
   }
@@ -1423,13 +1517,15 @@ Reply with only JSON in exactly this shape:
     let step = 0; PLAN_AT = 0;
     const real = !!window.WP_REAL, last = PLAN_STEPS('').length;
     const timer = setInterval(() => { const cap = real ? Math.max(1, PLAN_AT) : 4; if (step < cap) renderPlanning(t, ++step); }, real ? 900 : 1100);
-    const ai = await planTrip(t);
+    const ai = limited() ? (t.limitHit = true, false) : await planTrip(t);
     finishPlan(t);
     clearInterval(timer);
     for (let s = step + 1; s <= last; s++) { renderPlanning(t, s); await new Promise(r => setTimeout(r, 350)); }
     tripChanged(t); persist('trips'); renderWorld(); select(S.els.find(e => e.tripId === id)?.id || null);
+    if (t.limitHit) { tripChanged(t); persist('trips'); openLimit(t.limitBusy ? 'busy' : 'limit', t); delete t.limitBusy; return; }
     if (local) toast('Your photo shows for this visit only — photo saving isn’t available here.');
     else if (!ai) toast(claudeReady() ? 'Claude couldn’t plan this one, so here’s a starter plan to edit.' : 'Here’s a starter plan — edit any day in the planner.');
+    else { const nn = planNotes(t).length; if (nn) toast(`Plan ready — ${nn} ${nn === 1 ? 'thing' : 'things'} to know about it in the planner.`); }
     closeModal(); openPassport(id);
   }
   function syncAD() { const f = $('#adForm'); if (!f) return; const d = Object.fromEntries(new FormData(f).entries()); AD.name = d.name || ''; AD.country = d.country || ''; AD.days = +d.days || 5; AD.target = d.target || ''; AD.draft = !!d.draft; }
