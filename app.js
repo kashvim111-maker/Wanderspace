@@ -788,6 +788,13 @@
   }
   function renderItin() {
     const t = S.trips[IT.id]; if (!t) return closeModal();
+    if (IT.edit) {
+      $('#modal').innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Trip details"><div class="dialog tdlg">
+        <button class="icon-btn close" data-act="editClose" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
+        ${basicsHTML(t)}<div class="actions"><button class="btn btn-dark" data-act="editClose">Done</button></div></div></div>`;
+      fillSeason(t);
+      return;
+    }
     const tabs = [['route', 'Route & itinerary'], ['places', 'Places to visit'], ['check', 'Checklist']];
     const has = (t.itinerary || []).length || (t.places || []).length;
     $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Plan ${esc(t.name)}">
@@ -795,16 +802,14 @@
       <div class="pl-bg">${imgOr(coverSrc(t), t)}</div>
       <header class="pl-head">
         <button class="icon-btn" data-act="toPass" aria-label="Back to passport"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M8 1 L3 6 L8 11" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
-        <div class="pl-title"><span class="nm">${esc(t.name)}</span><span class="mono">${esc(t.country)} · ${t.days} days · ${fmtMonth(t.target)} · <b class="st-${t.status}">${t.status}</b></span></div>
+        <div class="pl-title"><span class="nm">${esc(t.name)}</span><span class="mono">${esc(t.country)}${t.country ? ' · ' : ''}${t.days} days</span></div>
         <nav class="pl-tabs" role="tablist">${tabs.map(([k, n]) => `<button class="pl-tab" role="tab" data-act="tab" data-v="${k}" aria-selected="${IT.tab === k}">${n}</button>`).join('')}</nav>
         <div class="pl-actions">
-          <button class="btn btn-lilac btn-sm" data-act="draft" ${claudeReady() && !IT.busy ? '' : 'disabled'} title="${claudeReady() ? '' : 'Claude isn’t available in this view'}"><svg width="13" height="13" viewBox="0 0 60 60"><path d="M30 2 L36 24 L58 30 L36 36 L30 58 L24 36 L2 30 L24 24Z" fill="currentColor"/></svg>${window.WP_REAL ? (has ? 'Replan with AI' : 'Plan with AI') : has ? 'Redraft with Claude' : 'Draft with Claude'}</button>
+          <button class="btn btn-lilac btn-sm" data-act="draft" ${claudeReady() && !IT.busy ? '' : 'disabled'} title="${claudeReady() ? '' : 'Claude isn’t available in this view'}"><svg width="13" height="13" viewBox="0 0 60 60"><path d="M30 2 L36 24 L58 30 L36 36 L30 58 L24 36 L2 30 L24 24Z" fill="currentColor"/></svg>${has ? 'Redraft with Wander Board' : 'Draft with Wander Board'}</button>
           <div class="menu-wrap"><button class="icon-btn" data-act="menu" aria-label="Trip options" aria-expanded="${!!IT.menu}">${ico('more', 16)}</button>
             ${IT.menu ? `<div class="pl-menu" role="menu">
-              <div class="mono" style="padding:6px 12px 4px;color:var(--ink-3)">Status</div>
-              ${STATUSES.map(s => `<button role="menuitemradio" aria-checked="${t.status === s}" data-act="status" data-v="${s}"><span class="dotst st-${s}"></span>${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}
-              <hr><button role="menuitem" data-act="editInfo">Edit trip details</button>
-              ${t.status !== 'visited' ? '<button role="menuitem" data-act="visited">Mark as visited</button>' : '<button role="menuitem" data-act="toMem">See memories</button>'}
+              <button role="menuitem" data-act="editInfo">Edit trip details</button>
+              <button role="menuitem" data-act="visitedPhotos">Visited? Add photos</button>
               <button role="menuitem" class="danger" data-act="removeTrip">Remove from board</button></div>` : ''}</div>
           <button class="icon-btn" data-act="close" aria-label="Close planner"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
         </div>
@@ -813,7 +818,6 @@
       ${IT.err ? `<div class="pl-note err">${esc(IT.err)}</div>` : ''}
       ${notesHTML(t)}
       <div class="pl-body">${planBody(t)}</div>
-      ${IT.edit ? `<div class="pl-pop" data-act="editClose"><div class="pl-pop-card" role="dialog" aria-label="Trip details">${basicsHTML(t)}<div class="actions"><button class="btn btn-dark btn-sm" data-act="editClose">Done</button></div></div></div>` : ''}
     </div></div>`;
     if (IT.tab === 'route' && !IT.busy) wireJourney(t);
   }
@@ -918,7 +922,7 @@
       ${start ? `<span class="jstart" style="left:${start.x / 10}%;top:${start.y / 6}%" title="Start from your stay"></span>` : ''}
       ${chips}${cards}
       ${!n ? `<div class="map-empty light"><h3>Nothing planned for this day</h3><button class="btn btn-white" data-act="panel" data-open="1">Add stops</button></div>` : ''}
-      <div class="jcap"><span class="mono">Day ${pad(i + 1)} of ${pad(t.itinerary.length)} · ${n} stops${total ? ' · ' + fmtMins(total) + ' getting around' : ''}${t.real ? ' · real routes · map data © OpenStreetMap contributors, Transitous' : ''}</span><span class="nm">${esc(d.title)}</span>${d.note ? `<span class="jnote">${esc(d.note)}</span>` : ''}</div>
+      <div class="jcap"><span class="nm">${esc(d.title)}</span>${d.note ? `<span class="jnote">${esc(d.note)}</span>` : ''}</div>
     </section>`;
   }
   function overviewSlide(t) {
@@ -940,7 +944,7 @@
   }
   function routeHTML(t) {
     const days = t.itinerary || [];
-    if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(coverSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? `<button class="btn btn-lilac" data-act="draft">${window.WP_REAL ? 'Plan with AI' : 'Draft with Claude'}</button>` : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
+    if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(coverSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? '<button class="btn btn-lilac" data-act="draft">Draft with Wander Board</button>' : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
     const N = days.length + 1, cur = clamp(IT.day, 0, N - 1);
     return `<div class="journey" tabindex="-1">
       <div class="jtrack" style="transform:translateY(${-cur * 100}%)">${days.map((_, i) => daySlide(t, i)).join('')}${overviewSlide(t)}</div>
@@ -1023,7 +1027,7 @@
     const cats = CAT_ORDER.filter(c => pl.some(([p]) => p.cat === c));
     const shown = pl.filter(([p]) => IT.pcat === 'all' || p.cat === IT.pcat);
     const done = pl.filter(([p]) => p.done).length;
-    return `<div class="sheet-head row"><div><h3>Places to visit</h3><p class="note">${pl.length} places · ${done} visited</p></div>
+    return `<div class="sheet-head row"><div><h3>Places to visit</h3><p class="note">${pl.length} places</p></div>
       <div class="pfilter">${[['all', 'All']].concat(cats.map(c => [c, CATS[c].n])).map(([k, n]) => `<button data-act="pcat" data-v="${k}" aria-pressed="${IT.pcat === k}">${k !== 'all' ? ico(k, 13) : ''}${n}</button>`).join('')}</div></div>
       <div class="pgrid2">${shown.map(([p, k]) => { const im = placeImg(t, p); return `<article class="pcard${p.done ? ' done' : ''}" data-k="${k}">
         <div class="pph">${im ? `<img src="${esc(im)}" alt="${esc(p.name)}" loading="lazy" data-cat="${p.cat}" onerror="this.outerHTML=window.WPTILE(this.dataset.cat)">` : tile(p.cat)}
@@ -1041,17 +1045,25 @@
       ${(t.precautions || []).length ? `<h3 class="prec-h">Precautions</h3><ul class="prec">${t.precautions.map(x => `<li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
   }
   function basicsHTML(t) {
-    return `<div class="sheet-head"><h3>Trip details</h3><p class="note">What shows on the passport.</p></div>
-      <div class="meta-grid">
-        <label><span class="k">Destination</span><input class="in" data-f="name" value="${esc(t.name)}"></label>
-        <label><span class="k">Country</span><input class="in" data-f="country" value="${esc(t.country)}"></label>
-        <label class="wide"><span class="k">Areas & states</span><input class="in" data-f="region" value="${esc(t.region || '')}"></label>
-        <label><span class="k">Best season</span><input class="in" data-f="season" value="${esc(t.season || '')}"></label>
-        <label><span class="k">Ideal number of days</span><input class="in" type="number" min="1" max="60" data-f="days" value="${t.days}"></label>
-        <label><span class="k">Budget</span><input class="in" data-f="budget" value="${esc(t.budget || '')}"></label>
-        <label><span class="k">Departure</span><input class="in" type="month" data-f="target" value="${esc(t.target || '')}"></label>
-        <label class="wide"><span class="k">Why go</span><input class="in" data-f="tagline" value="${esc(t.tagline || '')}"></label>
+    return `<div class="td-head"><h3>Trip details</h3><p>What shows on the passport.</p></div>
+      <div class="td-grid">
+        <label><span>Destination</span><input data-f="name" value="${esc(t.name)}"></label>
+        <label><span>Country</span><input data-f="country" value="${esc(t.country)}"></label>
+        <label><span>Best season</span><input data-f="season" value="${esc(t.season || '')}" placeholder="${t.seasonBusy ? 'Finding the best time to go…' : 'e.g. Oct–Mar'}"></label>
+        <label><span>Ideal number of days</span><input type="number" min="1" max="60" data-f="days" value="${t.days}"></label>
+        <label><span>Budget</span><input data-f="budget" value="${esc(t.budget || '')}" placeholder="e.g. ₹40k / person"></label>
+        <label><span>Departure</span><input type="month" data-f="target" value="${esc(t.target || '')}"></label>
       </div>`;
+  }
+  async function fillSeason(t) { // best season comes from the system, not the user
+    if (t.season || t.seasonBusy || !claudeReady()) return;
+    t.seasonBusy = true;
+    try {
+      const r = await caps.sample.json(`Best time of year to visit ${t.name}${t.country ? ', ' + t.country : ''} for a trip. Reply with only JSON: {"season":"short, e.g. Oct–Mar"}`);
+      if (r && r.season && !t.season) { t.season = String(r.season).slice(0, 40); tripChanged(t); }
+    } catch (e) { /* leave it for the user */ }
+    t.seasonBusy = false;
+    const inp = document.querySelector('.tdlg input[data-f="season"]'); if (inp && !inp.value) { inp.value = t.season || ''; inp.placeholder = 'e.g. Oct–Mar'; }
   }
   function tripChanged(t, board = true) { persist('trips'); if (board) { const e = S.els.find(x => x.tripId === t.id); if (e) rerenderEl(e); } }
   function setPanel(open) { IT.panel = open; const p = $('.dpanel'); if (p) p.classList.toggle('open', open); }
@@ -1069,7 +1081,7 @@
     if (act === 'toPass') return openPassport(t.id);
     if (act === 'menu') { IT.menu = !IT.menu; return renderItin(); }
     if (act === 'editInfo') { IT.menu = false; IT.edit = true; return renderItin(); }
-    if (act === 'editClose') { if (ev.target !== b && b.classList.contains('pl-pop')) return; IT.edit = false; return renderItin(); }
+    if (act === 'editClose') { IT.edit = false; return renderItin(); }
     if (act === 'tab') { IT.tab = b.dataset.v; IT.animate = b.dataset.v === 'route'; return renderItin(); }
     if (act === 'pcat') { IT.pcat = b.dataset.v; return renderItin(); }
     if (act === 'panel') { if (b.dataset.open) { setPanel(true); const c = $$('.dpanel .day')[IT.day]; c?.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; } return setPanel(!IT.panel); }
@@ -1093,6 +1105,11 @@
       return toast(`${t.name} is now in your Memories. Add photos from the trip there.`, { label: 'Open Memories', fn: () => { setTab('mem'); openFolder(t.country); } });
     }
     if (act === 'toMem') { closeModal(); setTab('mem'); return openFolder(t.country); }
+    if (act === 'visitedPhotos') {
+      t.status = 'visited'; tripChanged(t); closeModal(); setTab('mem');
+      const fd = FOLDERS().find(f => f.place === t.name || f.name === t.name);
+      return setTimeout(() => (fd ? openFolderDialog(fd) : openFolderDialog(null, { name: t.name, place: t.name, country: t.country })), 250);
+    }
     if (act === 'removeTrip') { const e = S.els.find(x => x.tripId === t.id); closeModal(); if (e) removeEl(e.id); else { delete S.trips[t.id]; persist('trips'); } return; }
   });
   $('#modal').addEventListener('change', ev => {
@@ -1391,7 +1408,7 @@ Reply with only JSON in exactly this shape:
       <span class="lim-badge">Free plan</span>
       <h3>${reason === 'busy' ? 'Planning is paused for now' : 'You’ve reached today’s planning limit'}</h3>
       <p class="lead">${why} Wander Passport runs on free AI and free, community-run map services, which only allow a few checked plans per person each day.</p>
-      ${t ? `<p class="lim-ok">${esc(t.name)} is saved on your board with ${t.days} empty days — you can fill them in yourself now, or come back tomorrow and press <b>Plan with AI</b> in its planner.</p>` : ''}
+      ${t ? `<p class="lim-ok">${esc(t.name)} is saved on your board with ${t.days} empty days — you can fill them in yourself now, or come back tomorrow and press <b>Draft with Wander Board</b> in its planner.</p>` : ''}
       <div class="lim-opts">
         <button class="lim-opt" data-lim="paid"><b>Request a paid plan</b><small>More plans a day, faster checks and public-transport times. Tell us you’d use it.</small></button>
         <button class="lim-opt" data-lim="more"><b>I’d like this built further</b><small>Liked it? Tell us what to build next.</small></button>
@@ -1417,8 +1434,8 @@ Reply with only JSON in exactly this shape:
   // honest notes about what this plan could and couldn't check
   function planNotes(t) {
     const n = [], r = t.real;
-    if (t.limitHit) n.push(['limit', 'AI planning wasn’t available when you added this trip, so the days are empty. Press “Plan with AI” to try again, or fill them in yourself.']);
-    else if (t.starter) n.push(['ai', 'This is a starter outline — AI planning wasn’t available, so the stops are placeholders, not real places. Edit them or try “Plan with AI” again later.']);
+    if (t.limitHit) n.push(['limit', 'AI planning wasn’t available when you added this trip, so the days are empty. Press “Draft with Wander Board” to try again, or fill them in yourself.']);
+    else if (t.starter) n.push(['ai', 'This is a starter outline — AI planning wasn’t available, so the stops are placeholders, not real places. Edit them or try “Draft with Wander Board” again later.']);
     if (r) {
       if (r.checked && r.found + (r.replaced || 0) < r.checked * 0.6) n.push(['remote', `This area isn’t well covered by the open map we use: we could only confirm ${r.found + (r.replaced || 0)} of ${r.checked} suggested places, so the days are shorter. Remote and rural places often have little map data — check a local guide too.`]);
       else if (r.dropped) n.push(['dropped', `We left out ${r.dropped} suggested ${r.dropped === 1 ? 'place' : 'places'} we couldn’t find on the map, so nothing here is made up.`]);
@@ -1798,8 +1815,8 @@ Reply with only JSON in exactly this shape:
     FDT.blob = blob; FDT.url = URL.createObjectURL(blob);
     const th = $('.fd-th'); if (th) th.innerHTML = `<img src="${FDT.url}" alt="">`;
   });
-  function openFolderDialog(edit) {
-    const fd = edit || { name: '', place: '', country: '', start: '', end: '' };
+  function openFolderDialog(edit, prefill) {
+    const fd = edit || { name: '', place: '', country: '', start: '', end: '', ...(prefill || {}) };
     $('#modal').innerHTML = `<div class="modal" data-fd="close" role="dialog" aria-modal="true" aria-label="${edit ? 'Edit trip' : 'Add a trip'}"><div class="dialog fdlg">
       <button class="icon-btn close" data-fd="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
       <h3>${edit ? 'Edit trip' : 'Add a trip'}</h3><p class="lead">Pick a thumbnail and the dates, then drop in as many photos and videos as you like — they stay together in your reel.</p>

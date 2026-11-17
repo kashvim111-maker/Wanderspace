@@ -1384,6 +1384,49 @@ body{font-synthesis-weight:none}
 .lim-opt b{font-size:15px}.lim-opt small{color:#5d5470;font-size:12.5px;line-height:1.4}
 .lim-more{display:grid;gap:8px;margin-bottom:12px}.lim-more textarea{width:100%;box-sizing:border-box;padding:10px 12px;font:500 14px var(--f-body);resize:vertical}
 .lim-more .btn{justify-self:end}
+
+/* ===== planner visual pass ===== */
+/* trip details: one clear glass dialog, readable text */
+.tdlg{width:min(600px,94vw);background:linear-gradient(150deg,rgba(40,32,58,.62),rgba(28,22,42,.5));border:1px solid rgba(255,255,255,.35);color:#fff}
+.tdlg .td-head h3{margin:0;font-family:var(--f-display);font-size:38px;color:#fff;line-height:1.05}
+.tdlg .td-head p{margin:6px 0 22px;color:#fff;opacity:.92;font-size:14.5px}
+.td-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 14px}
+.td-grid label{display:grid;gap:7px}
+.td-grid label>span{font:600 12.5px var(--f-body);color:#fff;letter-spacing:.01em}
+.tdlg input{height:46px;padding:0 16px!important;font:500 15px var(--f-body);color:#231d33!important;box-sizing:border-box;width:100%;min-width:0}
+.tdlg input::placeholder{color:#7a7090}
+.tdlg .actions{margin-top:22px;display:flex;justify-content:flex-end}
+.tdlg .close{color:#fff!important;background:rgba(255,255,255,.18)!important;border-color:rgba(255,255,255,.45)!important}
+@media (max-width:560px){.td-grid{grid-template-columns:1fr}}
+/* glass header buttons */
+.pl-head .icon-btn{width:38px;height:38px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.42);color:#fff;backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.35);transition:background .25s}
+.pl-head .icon-btn:hover{background:rgba(255,255,255,.3)}
+.pl-head .icon-btn svg{color:#fff;stroke:currentColor}
+/* route: softer background so the photos pop */
+.jbg img,.jbg svg{filter:blur(7px) saturate(1.05) brightness(.9);transform:scale(1.04)}
+.stop-card{padding:3px 3px 5px}
+.jhint{animation:none!important}
+/* places & checklist sit on the glass itself */
+.sheet{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.25);color:#fff}
+.sheet .sheet-head h3,.sheet .sheet-head .note{color:#fff}
+.sheet .sheet-head .note{opacity:.85}
+.pgrid2 .pcard{background:transparent;border-radius:16px;box-shadow:0 18px 34px -18px rgba(0,0,0,.7);padding:0;width:auto;overflow:hidden}
+.pcard .pph{aspect-ratio:4/5}
+.pcard .pph::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.78) 100%);pointer-events:none}
+.pcard .pbody{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:14px 14px 14px;color:#fff;pointer-events:none}
+.pcard .pbody b{color:#fff;font-size:16px;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+.pcard .pbody small{color:rgba(255,255,255,.85)}
+.pcard .pbody a{pointer-events:auto;color:#fff}
+.pcard.done .pbody b{color:rgba(255,255,255,.7)}
+.pcard .pdel{z-index:3}
+.sheet.center-top{background:rgba(255,255,255,.08)}
+.cklist{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.cklist h3,.cklist>.note,.cklist .ck label,.cklist .prec-h{color:#fff}
+.cklist>.note{opacity:.85}
+.cklist .ck{border-color:rgba(255,255,255,.22)}
+.cklist .ck.done label{color:rgba(255,255,255,.6)}
+.cklist .ckadd input{background:rgba(255,255,255,.85);color:#231d33}
+.cklist .ckadd .btn-ghost{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5);color:#fff}
 </style>
 </head>
 <body>
