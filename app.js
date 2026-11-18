@@ -797,8 +797,9 @@
     }
     const tabs = [['route', 'Route & itinerary'], ['places', 'Places to visit'], ['check', 'Checklist']];
     const has = (t.itinerary || []).length || (t.places || []).length;
+    const fresh = !$('.planner');
     $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Plan ${esc(t.name)}">
-    <div class="planner">
+    <div class="planner${fresh ? ' enter' : ''}">
       <div class="pl-bg">${imgOr(coverSrc(t), t)}</div>
       <header class="pl-head">
         <button class="icon-btn" data-act="toPass" aria-label="Back to passport"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M8 1 L3 6 L8 11" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
@@ -816,13 +817,26 @@
       </header>
       ${IT.confirm ? `<div class="pl-note confirm">This replaces the current days and places. <button class="btn btn-dark btn-sm" data-act="draftGo">Redraft</button><button class="btn btn-ghost btn-sm" data-act="draftCancel">Keep mine</button></div>` : ''}
       ${IT.err ? `<div class="pl-note err">${esc(IT.err)}</div>` : ''}
-      ${notesHTML(t)}
-      <div class="pl-body">${planBody(t)}</div>
+      <div class="pl-body"><div class="pane">${planBody(t)}</div></div>
     </div></div>`;
     if (IT.tab === 'route' && !IT.busy) wireJourney(t);
-    // "About this plan" folds away as you scroll the places or checklist
-    const sh = $('.pl-body .sheet'), pl = $('.planner');
-    if (sh && pl) sh.addEventListener('scroll', () => pl.classList.toggle('scrolled', sh.scrollTop > 24), { passive: true });
+  }
+  // tabs slide between each other (no re-render flash); jumping two tabs goes straight there
+  const TAB_ORDER = ['route', 'places', 'check'];
+  function switchTab(to) {
+    const t = S.trips[IT.id], body = $('.pl-body'); if (!t || !body || IT.tab === to) return;
+    const dir = TAB_ORDER.indexOf(to) > TAB_ORDER.indexOf(IT.tab) ? 1 : -1;
+    IT.tab = to; IT.animate = to === 'route';
+    $$('.pl-tab').forEach(b => b.setAttribute('aria-selected', b.dataset.v === to));
+    body.querySelectorAll('.pane.leaving').forEach(p => p.remove());
+    const old = body.querySelector('.pane');
+    const pane = document.createElement('div'); pane.className = 'pane entering'; pane.style.setProperty('--dir', dir);
+    pane.innerHTML = planBody(t);
+    body.appendChild(pane);
+    if (old) { old.style.setProperty('--dir', dir); old.classList.add('leaving'); }
+    if (to === 'route' && !IT.busy) wireJourney(t);
+    requestAnimationFrame(() => requestAnimationFrame(() => pane.classList.remove('entering')));
+    setTimeout(() => { if (old) old.remove(); }, 650);
   }
   function notesHTML(t) {
     const n = planNotes(t); if (!n.length || IT.busy) return '';
@@ -849,8 +863,8 @@
     const pts = t.itinerary.map((_, i) => {
       const x = n === 1 ? 500 : 120 + (760 * i) / (n - 1);
       const geo = lls[i] && la1 > la0 ? (la1 - lls[i][0]) / (la1 - la0) - .5 : r() - .5;
-      const base = n <= 3 ? 420 : (i % 2 ? 505 : 305);
-      return { x, y: base + geo * 50, below: false };
+      const base = n <= 3 ? 300 : (i % 2 ? 330 : 190);
+      return { x, y: base + geo * 40, below: false };
     });
     return { pts, lls };
   }
@@ -887,9 +901,9 @@
     const r = rng(seed);
     const pts = [];
     for (let j = 0; j < n; j++) {
-      const x = n === 1 ? 500 : 175 + (650 * j) / (n - 1);
+      const x = n === 1 ? 480 : 160 + (630 * j) / (n - 1); // keeps clear of the day strip on the right
       const top = j % 2 === 0;
-      pts.push({ x: x + (r() * 30 - 15), y: (top ? 150 : 330) + r() * 40 });
+      pts.push({ x: x + (r() * 30 - 15), y: (top ? 150 : 290) + r() * 30 });
     }
     return pts;
   }
@@ -949,8 +963,13 @@
     const days = t.itinerary || [];
     if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(coverSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? '<button class="btn btn-lilac" data-act="draft">Draft with Wander Board</button>' : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
     const N = days.length + 1, cur = clamp(IT.day, 0, N - 1);
-    return `<div class="journey" tabindex="-1">
+    const notes = planNotes(t);
+    return `<div class="journey${IT.panel ? ' panel-open' : ''}" tabindex="-1">
+      <div class="jbg jbg-fixed">${imgOr(coverSrc(t), t)}</div>
+      <div class="jstage">
       <div class="jtrack" style="transform:translateY(${-cur * 100}%)">${days.map((_, i) => daySlide(t, i)).join('')}${overviewSlide(t)}</div>
+      ${notes.length ? `<button class="jinfo" data-act="notesPop" aria-expanded="false" aria-label="About this plan" title="About this plan">${ico('info', 18, 2.2)}</button>
+      <div class="jnotes" role="dialog" aria-label="About this plan"><b>About this plan</b><ul>${notes.map(([k, s]) => `<li class="nt-${k}">${esc(s)}</li>`).join('')}</ul>${notes.some(([k]) => k === 'limit') ? `<div class="pl-notes-a"><button class="btn btn-ghost btn-sm" data-act="reqPaid">Request a paid plan</button><button class="btn btn-ghost btn-sm" data-act="reqMore">Suggest a feature</button></div>` : ''}</div>` : ''}
       <div class="jsearch" role="search">
         <span class="jpin">${ico('pin', 20, 0)}</span>
         <input id="jq" type="search" autocomplete="off" placeholder="Search places in ${esc(t.name)}…" value="${esc(IT.q || '')}" aria-label="Search places in ${esc(t.name)}">
@@ -960,6 +979,7 @@
       <nav class="jpager" aria-label="Days">${days.map((_, i) => `<button data-act="pickday" data-v="${i}" aria-current="${cur === i}" title="Day ${i + 1}: ${esc(days[i].title)}"><span>${pad(i + 1)}</span></button>`).join('')}<button data-act="pickday" data-v="${days.length}" aria-current="${cur === days.length}" title="Whole trip"><span>All</span></button></nav>
       <button class="btn btn-white btn-sm dtoggle" data-act="panel"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 3 H12 M2 7 H12 M2 11 H8" stroke="currentColor" stroke-width="1.8"/></svg>Day-by-day plan</button>
       <div class="jhint" id="jhint">${cur < days.length ? `Scroll for ${cur + 1 < days.length ? 'Day ' + (cur + 2) : 'the whole trip'}` : 'Scroll up to go back'} <span aria-hidden="true">${cur < days.length ? '↓' : '↑'}</span></div>
+      </div>
       <aside class="dpanel${IT.panel ? ' open' : ''}" aria-label="Day-by-day plan">
         <div class="dpanel-head"><div><span class="mono" style="color:var(--lilac-ink)">${days.length} days · ${days.reduce((a, d) => a + d.items.length, 0)} stops</span><h3>Day by day</h3></div><button class="icon-btn" data-act="panel" aria-label="Hide day-by-day plan"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M4 1 L9 6 L4 11" stroke="currentColor" stroke-width="2" fill="none"/></svg></button></div>
         <div class="dpanel-body">${daysHTML(t)}</div>
@@ -1069,7 +1089,7 @@
     const inp = document.querySelector('.tdlg input[data-f="season"]'); if (inp && !inp.value) { inp.value = t.season || ''; inp.placeholder = 'e.g. Oct–Mar'; }
   }
   function tripChanged(t, board = true) { persist('trips'); if (board) { const e = S.els.find(x => x.tripId === t.id); if (e) rerenderEl(e); } }
-  function setPanel(open) { IT.panel = open; const p = $('.dpanel'); if (p) p.classList.toggle('open', open); }
+  function setPanel(open) { IT.panel = open; const p = $('.dpanel'); if (p) p.classList.toggle('open', open); const j = $('.journey'); if (j) j.classList.toggle('panel-open', open); }
 
   $('#modal').addEventListener('click', ev => {
     if (ev.target.dataset.backdrop) return closeModal();
@@ -1085,7 +1105,8 @@
     if (act === 'menu') { IT.menu = !IT.menu; return renderItin(); }
     if (act === 'editInfo') { IT.menu = false; IT.edit = true; return renderItin(); }
     if (act === 'editClose') { IT.edit = false; return renderItin(); }
-    if (act === 'tab') { IT.tab = b.dataset.v; IT.animate = b.dataset.v === 'route'; return renderItin(); }
+    if (act === 'tab') return switchTab(b.dataset.v);
+    if (act === 'notesPop') { const pop = $('.jnotes'); if (pop) { const o = !pop.classList.contains('open'); pop.classList.toggle('open', o); b.setAttribute('aria-expanded', o); } return; }
     if (act === 'pcat') { IT.pcat = b.dataset.v; return renderItin(); }
     if (act === 'panel') { if (b.dataset.open) { setPanel(true); const c = $$('.dpanel .day')[IT.day]; c?.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; } return setPanel(!IT.panel); }
     if (act === 'pickday') { return setSlide(+b.dataset.v); }
