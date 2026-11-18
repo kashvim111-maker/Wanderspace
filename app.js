@@ -2322,6 +2322,19 @@ Reply with only a JSON array with one object per photo in the same order:
     for (let d = new Date(s), k = 0; d <= e && k < 31; d.setDate(d.getDate() + 1), k++) out.push({ id: `r-${t.folder.id}-${k}`, date: d.toISOString().slice(0, 10), photo: memSrc(t.cover), folder: t.folder.id, dest: t.folder.name });
     return out;
   }
+  // every day of a trip is circled on the calendar, each with one of the trip's photos
+  function calRange(t, items) {
+    if (!t.from) return t.items;
+    const pics = items.filter(m => memSrc(m) && m.type !== 'video'), pool = pics.length ? pics : items.filter(m => memSrc(m));
+    const out = [], s = new Date(t.from + 'T12:00:00'), e = new Date((t.to && t.to >= t.from ? t.to : t.from) + 'T12:00:00');
+    for (let d = new Date(s), k = 0; d <= e && k < 62; d.setDate(d.getDate() + 1), k++) {
+      const iso = d.toISOString().slice(0, 10);
+      const same = pool.find(m => m.date === iso);
+      const pick = same || pool[k % (pool.length || 1)];
+      out.push({ id: `c-${t.folder.id}-${k}`, date: iso, photo: pick ? memSrc(pick) : memSrc(t.cover), folder: t.folder.id, dest: t.folder.name, place: t.folder.place });
+    }
+    return out;
+  }
   function reelTrips() {
     const loose = reelAll().filter(m => !(m.folder && folderById(m.folder)));
     const trips = groupTrips(loose);
@@ -2332,6 +2345,7 @@ Reply with only a JSON array with one object per photo in the same order:
       const from = fd.start || (items[0] && items[0].date) || new Date().toISOString().slice(0, 10);
       const t = { key: fd.country || fd.place || fd.name, city: fd.place && fd.place !== fd.country ? fd.place : '', items, from, to: fd.end || (items.length ? items[items.length - 1].date : from), cover, folder: fd };
       t.items = rangeItems(t); t.real = items.length;
+      t.calItems = calRange(t, items);
       trips.push(t);
     });
     return trips.sort((x, y) => x.from.localeCompare(y.from));
@@ -2433,7 +2447,7 @@ Reply with only a JSON array with one object per photo in the same order:
   const ARROW = d => `<svg width="12" height="12" viewBox="0 0 24 24"><path d="${d < 0 ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>`;
   function renderReelCal() {
     const card = $('#rcal'); if (!card) return;
-    const t = REEL.trips[Math.max(0, REEL.cur)] || null, all = REEL.trips.flatMap(x => x.items);
+    const t = REEL.trips[Math.max(0, REEL.cur)] || null, all = REEL.trips.flatMap(x => x.calItems || x.items);
     const ym = t ? t.from.slice(0, 7) : `${REEL.year}-${REEL.year === nowYear() ? String(new Date().getMonth() + 1).padStart(2, '0') : '01'}`;
     const [y, mo] = ym.split('-').map(Number);
     if (!REEL.calBuilt) {
@@ -2453,7 +2467,7 @@ Reply with only a JSON array with one object per photo in the same order:
     }
     const dir = !REEL.ym ? 0 : ym > REEL.ym ? 1 : -1;
     REEL.ym = ym;
-    const tripOf = new Map(); REEL.trips.forEach(tr => tr.items.forEach(m => tripOf.set(m.id, tr.i)));
+    const tripOf = new Map(); REEL.trips.forEach(tr => (tr.calItems || tr.items).forEach(m => tripOf.set(m.id, tr.i)));
     const inMonth = all.filter(m => m.date.slice(0, 7) === ym);
     const byDay = new Map(); inMonth.forEach(m => { const d = +m.date.slice(8, 10); if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(m); });
     const places = Array.from(new Set(inMonth.map(placeOf)));
@@ -2560,7 +2574,7 @@ Reply with only a JSON array with one object per photo in the same order:
     $('#modal').innerHTML = `<div class="modal" data-tg="close" role="dialog" aria-modal="true" aria-label="Memories from ${esc(t.key)}"><div class="tgal glass-x">
       <div class="tg-head"><div><h3>${esc(t.folder ? t.folder.name : t.key)}${t.city ? `<em>${esc(t.city)}</em>` : ''}</h3><p>${items.length} ${items.length === 1 ? 'memory' : 'memories'}${t.folder && t.folder.start ? ' · ' + esc(fmtRange(t.folder.start, t.folder.end)) : ''}</p></div>
       <div class="tg-acts">${t.folder ? `<button class="btn btn-sm tg-btn" data-tg="upload"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Add photos & videos</button><button class="btn btn-sm tg-btn tg-alt" data-tg="edit">Edit trip</button>` : ''}<button class="icon-btn close" data-tg="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button></div></div>
-      <div class="tg-scroll">${items.length ? `<div class="tg-grid" id="tgMosaic">${items.map((m, k) => `<figure class="tg-it" style="--d:${Math.min(k, 14) * 0.04}s" data-id="${esc(m.id)}">${m.type === 'video' && m.url ? `<video src="${esc(m.url)}" muted loop playsinline autoplay preload="metadata"></video>` : `<img src="${esc(memSrc(m))}" alt="${esc(m.place || m.city || placeOf(m))}" loading="lazy" draggable="false">`}<button class="tg-x" data-tg="del" data-id="${esc(m.id)}" aria-label="Remove this ${m.type === 'video' ? 'video' : 'photo'}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></figure>`).join('')}</div>` : (t.folder ? `<button class="tg-drop" id="tgMosaic" data-tg="upload"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Add photos & videos</b><small>Select loads at once, drop them here, or paste</small></button>` : '')}</div></div></div>`;
+      <div class="tg-scroll">${items.length ? `<div class="tg-grid" id="tgMosaic" style="--cols:${Math.min(4, Math.max(2, items.length))}">${items.map((m, k) => `<figure class="tg-it" style="--d:${Math.min(k, 14) * 0.04}s" data-id="${esc(m.id)}">${m.type === 'video' && m.url ? `<video src="${esc(m.url)}" muted loop playsinline autoplay preload="metadata"></video>` : `<img src="${esc(memSrc(m))}" alt="${esc(m.place || m.city || placeOf(m))}" loading="lazy" draggable="false">`}<button class="tg-x" data-tg="del" data-id="${esc(m.id)}" aria-label="Remove this ${m.type === 'video' ? 'video' : 'photo'}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></figure>`).join('')}</div>` : (t.folder ? `<button class="tg-drop" id="tgMosaic" data-tg="upload"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>Add photos & videos</b><small>Select loads at once, drop them here, or paste</small></button>` : '')}</div></div></div>`;
     requestAnimationFrame(() => document.querySelectorAll('.tg-it').forEach(f => f.classList.add('in')));
   }
   const PEND_DEL = new Map();

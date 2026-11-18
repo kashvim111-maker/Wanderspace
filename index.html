@@ -1595,6 +1595,10 @@ body{font-synthesis-weight:none}
 }
 .rname h2{font-size:clamp(38px,4.8vw,86px)}
 @media (max-width:1100px){.rname h2{font-size:43px}}
+
+/* trip gallery: 1–2 items → 2 columns, 3 → 3, 4+ → 4 (photos keep their own shape) */
+.tg-grid{columns:var(--cols,4)!important;column-width:auto!important}
+@media (max-width:700px){.tg-grid{columns:2!important}}
 </style>
 </head>
 <body>
@@ -1604,8 +1608,8 @@ body{font-synthesis-weight:none}
     <span class="brand-name">Wander<em>Passport</em></span>
   </button>
   <nav class="tabs" role="tablist" aria-label="Sections">
-    <button class="tab" role="tab" id="tab-dream" aria-selected="true">My Travel Visionary <span class="count" id="c-trips"></span></button>
     <button class="tab" role="tab" id="tab-mem" aria-selected="false">My Camera Roll <span class="count" id="c-mem"></span></button>
+    <button class="tab" role="tab" id="tab-dream" aria-selected="true">My Travel Visionary <span class="count" id="c-trips"></span></button>
   </nav>
   <div class="top-actions">
     <span class="save-state" id="save" data-s="idle">Starter board</span>
