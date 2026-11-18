@@ -27,7 +27,7 @@
   .auth-sw button{border:0;background:none;color:#fff;font:700 13.5px Figtree,system-ui,sans-serif;text-decoration:underline;cursor:pointer}
   .auth-msg{margin:4px 0 8px;padding:10px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;background:rgba(255,255,255,.16)}
   .auth-msg.err{background:rgba(220,60,80,.35)}
-  .acct{position:fixed;z-index:60;left:18px;bottom:18px;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-radius:999px;font:600 12.5px Figtree,system-ui,sans-serif;color:#2a2438;background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);backdrop-filter:blur(16px);box-shadow:0 10px 30px -14px rgba(0,0,0,.5)}
+  .acct{position:fixed;z-index:60;right:18px;bottom:18px;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-radius:999px;font:600 12.5px Figtree,system-ui,sans-serif;color:#2a2438;background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);backdrop-filter:blur(16px);box-shadow:0 10px 30px -14px rgba(0,0,0,.5)}
   .acct .acct-loc{background:rgba(255,255,255,.7);color:#2a2438;border:1px solid rgba(42,36,56,.12)}
   .acct button{border:0;border-radius:999px;padding:7px 12px;background:#2a2438;color:#fff;font:600 12px Figtree,system-ui,sans-serif;cursor:pointer}`;
   const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
@@ -181,7 +181,11 @@
             }
             if (key.startsWith('m-')) {
               const row = memRow(uid, { ...val, id: key });
-              if (row.folder_id) { const f = (lastPrefs.folders || []).find(x => x.id === row.folder_id); if (f) await syncFolders(uid, lastPrefs.folders).catch(() => {}); else row.folder_id = null; }
+              if (row.folder_id) {
+                // the trip may be newer than the last saved prefs — take the app's current list so the photo keeps its trip
+                const cur = (window.WP_FOLDERS && window.WP_FOLDERS()) || lastPrefs.folders || [];
+                if (cur.some(x => x.id === row.folder_id)) await syncFolders(uid, cur).catch(() => {}); else row.folder_id = null;
+              }
               const { error } = await SB.from('memories').upsert(row, { onConflict: 'user_id,id' }); if (error) fail(error);
             }
           },
@@ -232,6 +236,27 @@
       }
       return data && data.result;
     },
+  };
+
+  /* storage tidy-up: delete this user's files that nothing points to any more */
+  window.WP_SWEEP_STORAGE = async () => {
+    const { data: s } = await SB.auth.getSession(); const uid = s && s.session && s.session.user.id; if (!uid) return 0;
+    const [m, b, t, p] = await Promise.all([
+      SB.from('memories').select('url,thumb').eq('user_id', uid),
+      SB.from('boards').select('els').eq('user_id', uid),
+      SB.from('trips').select('*').eq('user_id', uid),
+      SB.from('profiles').select('prefs').eq('id', uid),
+    ]);
+    if ([m, b, t, p].some(r => r.error)) return 0; // never guess when something didn't load
+    const blob = JSON.stringify([m.data, b.data, t.data, p.data]);
+    const used = new Set();
+    for (const re of [/sb:([^"\\]+)/g, /\/object\/sign\/media\/([^?"\\]+)/g]) { let x; while ((x = re.exec(blob))) used.add(decodeURIComponent(x[1])); }
+    const files = []; let off = 0;
+    while (true) { const { data, error } = await SB.storage.from(BUCKET).list(uid, { limit: 1000, offset: off }); if (error) return 0; files.push(...data); if (data.length < 1000) break; off += 1000; }
+    const old = Date.now() - 15 * 60 * 1000; // leave anything uploaded in the last 15 minutes alone
+    const gone = files.filter(f => f.name && !used.has(`${uid}/${f.name}`) && new Date(f.created_at || 0).getTime() < old).map(f => `${uid}/${f.name}`);
+    for (let i = 0; i < gone.length; i += 100) await SB.storage.from(BUCKET).remove(gone.slice(i, i + 100));
+    return gone.length;
   };
 
   /* product requests: paid plan, feature ideas, limit hits */

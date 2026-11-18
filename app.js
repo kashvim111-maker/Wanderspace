@@ -116,7 +116,7 @@
 
   async function connect() {
     const cl = window.claude;
-    if (!cl || typeof cl.use !== 'function') { loadLocal(); renderAll(); setSave('local'); return; }
+    if (!cl || typeof cl.use !== 'function') { loadLocal(); renderAll(); setSave('local'); sweepLoose().catch(() => {}); return; }
     const [db, user, assets, sample] = await Promise.all(['db', 'user', 'assets', 'sample'].map(n => cl.use(n).catch(() => null)));
     caps.assets = assets; caps.sample = sample; caps.db = db;
     let uid = null;
@@ -141,7 +141,7 @@
       Object.values(S.mems).forEach(m => { if (m.local || m.pending) mems[m.id] = m; });
       S.mems = mems;
       if (changedBoard && !op && !editing) renderWorld();
-      if (first) { first = false; if (changedBoard) fitBoard(); setSave('idle'); }
+      if (first) { first = false; if (changedBoard) fitBoard(); setSave('idle'); if (snap.docs.some(d => d.id === 'prefs')) setTimeout(() => sweepLoose().catch(() => {}), 1200); }
       if (!$('#modal').innerHTML) renderMem();
       renderCounts();
     }, err => { clearTimeout(timer); setSave('local', 'Saving unavailable'); });
@@ -1812,6 +1812,32 @@ Reply with only JSON in exactly this shape:
     return '<span class="badge b-none">Unplaced</span>';
   }
   let upDest = null;
+  let PENDING_FILES = null;
+  function chooseTrip(files) {
+    const trips = FOLDERS();
+    if (!trips.length) { PENDING_FILES = files; toast('Add the trip first — your photos go straight into it.'); return openFolderDialog(); }
+    if (trips.length === 1) return processFiles(files, trips[0].name);
+    $('#modal').innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Which trip are these from?"><div class="dialog pickdlg">
+      <button class="icon-btn close" data-pick="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
+      <h3>Which trip are these from?</h3><p class="lead">${files.length} ${files.length === 1 ? 'file' : 'files'} — every photo and video is kept inside a trip.</p>
+      <div class="pick-list">${trips.map(f => `<button class="pick-trip" data-pick="${esc(f.id)}"><b>${esc(f.name)}</b><small>${esc([f.place, f.start ? fmtRange(f.start, f.end) : ''].filter(Boolean).join(' · '))}</small></button>`).join('')}</div>
+      <div class="actions"><button class="btn btn-ghost" data-pick="new">+ New trip</button></div></div></div>`;
+    $('#modal').onclick = ev => {
+      const b = ev.target.closest('[data-pick]'); if (!b) return;
+      $('#modal').onclick = null; const k = b.dataset.pick;
+      if (k === 'close') return closeModal();
+      if (k === 'new') { PENDING_FILES = files; return openFolderDialog(); }
+      const f = folderById(k); closeModal(); if (f) processFiles(files, f.name);
+    };
+  }
+  // photos that aren't inside any trip (left over from deleted trips) are removed — no trip, no photos
+  async function sweepLoose() {
+    const ids = new Set(FOLDERS().map(f => f.id));
+    const loose = Object.values(S.mems).filter(m => !m.folder || !ids.has(m.folder));
+    if (loose.length) { await Promise.all(loose.map(m => deleteMem(m.id))); if (!caps.col) persist('prefs'); REEL.sig = ''; renderMem(); renderCounts(); }
+    if (window.WP_SWEEP_STORAGE) window.WP_SWEEP_STORAGE().catch(() => {});
+  }
+  window.WP_FOLDERS = () => FOLDERS();
   const pickFiles = dest => { upDest = dest || null; $('#fileMem').click(); };
   $('#detailSec').addEventListener('click', ev => {
     const b = ev.target.closest('[data-m]'); if (!b) return;
@@ -1896,6 +1922,7 @@ Reply with only JSON in exactly this shape:
     REEL.gal = null; S.folder = null; REEL.sig = '';
     closeModal(); renderMem();
     const left = reelTrips().length;
+    if (window.WP_SWEEP_STORAGE) setTimeout(() => window.WP_SWEEP_STORAGE().catch(() => {}), 1500);
     toast(`Deleted “${fm.name}”${mems.length ? ` and its ${mems.length} ${mems.length === 1 ? 'memory' : 'memories'}` : ''}.`);
     if (!left) { // nothing left: take them to adding their first trip
       const reel = $('#reel'), view = $('#view-mem');
@@ -1924,7 +1951,7 @@ Reply with only JSON in exactly this shape:
     renderMem();
     const t = reelTrips().find(x => x.folder && x.folder.name === name);
     if (t) openTripGallery(t); else $('#modal').innerHTML = '';
-    if (!editId) setTimeout(() => pickFiles(name), 350);
+    if (!editId) { const pend = PENDING_FILES; PENDING_FILES = null; setTimeout(() => (pend ? processFiles(pend, name) : pickFiles(name)), 350); }
   });
 
   /* lightbox */
@@ -2115,6 +2142,7 @@ Reply with only a JSON array with one object per photo in the same order:
     if (!list.length) return toast('Choose photos or videos.');
     if (S.tab !== 'mem') setTab('mem');
     dest = dest && dest !== 'Unsorted' ? dest : null;
+    if (!dest || !folderByName(dest)) return chooseTrip(list); // every photo lives inside a trip
     const items = list.map(f => ({ id: rid('m-'), file: f, state: 'Waiting…', dest }));
     S.queue = S.queue.filter(x => !x.rec).concat(items);
     renderQueue();

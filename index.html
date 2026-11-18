@@ -1576,6 +1576,16 @@ body{font-synthesis-weight:none}
 .jnotes li.nt-limit,.jnotes li.nt-ai{color:#ffe2b8}
 .jnotes .btn-ghost{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.5);color:#fff}
 @media (max-width:820px){.journey.panel-open .jstage{right:0}}
+
+/* no "changes saved" chip; account chip lives bottom-right, upload panel sits above it */
+#save{display:none!important}
+.queue{bottom:78px}
+/* which-trip chooser */
+.pickdlg{width:min(460px,94vw)}
+.pick-list{display:grid;gap:8px;margin:4px 0 14px;max-height:46vh;overflow:auto}
+.pick-trip{display:grid;gap:2px;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);cursor:pointer;font-family:var(--f-body);transition:background .2s}
+.pick-trip:hover{background:rgba(255,255,255,.22)}
+.pick-trip b{font-size:15px}.pick-trip small{opacity:.85;font-size:12.5px}
 </style>
 </head>
 <body>
