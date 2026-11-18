@@ -255,6 +255,13 @@
           urlToPath.set(data.signedUrl, path);
           return { url: data.signedUrl };
         },
+        async remove(url) { // delete an uploaded file (e.g. a trip thumbnail) from storage
+          let path = urlToPath.get(url) || (typeof url === 'string' && url.startsWith('sb:') ? url.slice(3) : '');
+          if (!path && typeof url === 'string') { const m = /\/object\/sign\/media\/([^?]+)/.exec(url); if (m) path = decodeURIComponent(m[1]); }
+          if (!path || !path.startsWith(uid + '/')) return false;
+          const { error } = await SB.storage.from(BUCKET).remove([path]);
+          return !error;
+        },
       };
       if (name === 'sample') return sample;
       throw new Error('unknown capability');

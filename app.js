@@ -1839,13 +1839,49 @@ Reply with only JSON in exactly this shape:
     if (b.dataset.fd === 'close') { if (b.classList.contains('modal') && ev.target !== b) return; $('#modal').innerHTML = ''; }
     if (b.dataset.fd === 'thumb') thumbInput.click();
     if (b.dataset.fd === 'del') {
-      const id = $('#fdForm').dataset.edit, fm = folderById(id); if (!fm) return;
-      if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to delete (photos are kept)'; return; }
-      S.prefs.folders = FOLDERS().filter(x => x.id !== id);
-      Object.values(S.mems).forEach(m => { if (m.folder === id) { m.folder = null; if (m.dest === fm.name) m.dest = fm.place || ''; saveMem(m); } });
-      persist('prefs'); $('#modal').innerHTML = ''; S.folder = null; renderMem(); toast(`Deleted “${fm.name}”. Its photos are still in Memories.`);
+      const id = $('#fdForm').dataset.edit, fm = folderById(id); if (fm) confirmDeleteTrip(fm);
     }
   });
+  /* deleting a camera-roll trip removes everything in it: photos, videos, thumbnail and dates */
+  function confirmDeleteTrip(fm) {
+    const mems = realMems().filter(m => m.folder === fm.id), n = mems.length;
+    const vids = mems.filter(m => m.type === 'video').length, pics = n - vids;
+    const what = [pics ? `${pics} ${pics === 1 ? 'photo' : 'photos'}` : '', vids ? `${vids} ${vids === 1 ? 'video' : 'videos'}` : ''].filter(Boolean).join(' and ') || 'no photos yet';
+    $('#modal').innerHTML = `<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="delT" aria-describedby="delD"><div class="dialog deldlg">
+      <div class="del-ic" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></div>
+      <h3 id="delT">Are you sure you want to delete “${esc(fm.name)}”?</h3>
+      <p class="lead" id="delD">This permanently deletes the trip from your camera roll, along with:</p>
+      <ul class="del-list"><li>${esc(what)}</li><li>its thumbnail</li>${fm.start ? `<li>its dates — ${esc(fmtRange(fm.start, fm.end))}</li>` : ''}${fm.place ? `<li>its place — ${esc([fm.place, fm.country].filter(Boolean).join(', '))}</li>` : ''}</ul>
+      <p class="del-warn">This can’t be undone.</p>
+      <div class="actions"><button class="btn btn-ghost" data-del="no">Cancel</button><button class="btn btn-danger" data-del="yes">Delete trip</button></div>
+    </div></div>`;
+    $('#modal').querySelector('[data-del="no"]').focus();
+    $('#modal').onclick = async ev => {
+      const b = ev.target.closest('[data-del]'); if (!b) return;
+      if (b.dataset.del === 'no') { $('#modal').onclick = null; return openFolderDialog(fm); }
+      b.disabled = true; b.textContent = n ? `Deleting ${n}…` : 'Deleting…';
+      $('#modal').onclick = null;
+      await deleteTrip(fm);
+    };
+  }
+  async function deleteTrip(fm) {
+    const mems = Object.values(S.mems).filter(m => m.folder === fm.id);
+    PEND_DEL.forEach((tm, id) => { if (mems.some(m => m.id === id)) { clearTimeout(tm); PEND_DEL.delete(id); } });
+    await Promise.all(mems.map(m => deleteMem(m.id)));            // photos & videos, and their stored files
+    if (fm.cover && caps.assets && caps.assets.remove) { try { await caps.assets.remove(fm.cover); } catch (e) { /* ignore */ } }
+    if (S.queue && S.queue.length) { const gone = new Set(mems.map(m => m.id)); S.queue = S.queue.filter(q => !gone.has(q.id) && q.dest !== fm.name); renderQueue(); }
+    S.prefs.folders = FOLDERS().filter(x => x.id !== fm.id);      // the trip, its place and dates
+    persist('prefs');
+    REEL.gal = null; S.folder = null; REEL.sig = '';
+    closeModal(); renderMem();
+    const left = reelTrips().length;
+    toast(`Deleted “${fm.name}”${mems.length ? ` and its ${mems.length} ${mems.length === 1 ? 'memory' : 'memories'}` : ''}.`);
+    if (!left) { // nothing left: take them to adding their first trip
+      const reel = $('#reel'), view = $('#view-mem');
+      if (reel && view) view.scrollTo({ top: reel.offsetTop, behavior: 'smooth' });
+      setTimeout(() => { const add = document.querySelector('[data-reel="addtrip"]'); if (add) { add.classList.add('nudge'); setTimeout(() => add.classList.remove('nudge'), 2400); } }, 700);
+    }
+  }
   $('#modal').addEventListener('submit', async ev => {
     if (ev.target.id !== 'fdForm') return;
     ev.preventDefault();

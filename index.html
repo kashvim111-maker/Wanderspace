@@ -1520,6 +1520,19 @@ body{font-synthesis-weight:none}
 .dialog .form label,.fdlg .form label{color:#fff}
 .q-item .stt.ok{color:#a6efc1}
 .queue .q-head b,.queue .q-name,.queue .q-item b{color:#fff}
+
+/* delete-trip confirmation */
+.deldlg{width:min(460px,94vw)}
+.del-ic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;margin-bottom:14px;background:rgba(255,120,140,.18);border:1px solid rgba(255,160,175,.5);color:#ffc2cc}
+.deldlg h3{font-size:30px!important;line-height:1.1}
+.del-list{margin:0 0 12px;padding:0 0 0 18px;display:grid;gap:5px;font-size:14px;line-height:1.45}
+.del-warn{margin:0 0 4px;font-weight:600;color:#ffc2cc!important}
+.deldlg .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.btn-danger{background:#e0455a;color:#fff!important;border:0;box-shadow:0 12px 24px -12px rgba(224,69,90,.8)}
+.btn-danger:hover{background:#c93649}
+.dialog .btn-danger,.dialog .btn-danger *{color:#fff!important}
+.frame.add.nudge{animation:addNudge 1.2s cubic-bezier(.34,1.56,.64,1) 2}
+@keyframes addNudge{0%,100%{transform:none}40%{transform:scale(1.05)}70%{transform:scale(.98)}}
 </style>
 </head>
 <body>
