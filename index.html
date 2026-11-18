@@ -1586,6 +1586,15 @@ body{font-synthesis-weight:none}
 .pick-trip{display:grid;gap:2px;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);cursor:pointer;font-family:var(--f-body);transition:background .2s}
 .pick-trip:hover{background:rgba(255,255,255,.22)}
 .pick-trip b{font-size:15px}.pick-trip small{opacity:.85;font-size:12.5px}
+
+/* camera-roll strip sits centred under the two tabs; title 0.8x */
+@media (min-width:861px){
+  .rstage{left:0!important;right:0!important;display:block!important}
+  .booth{position:absolute!important;left:50%!important;top:0!important;bottom:0!important;transform:translateX(-50%)!important}
+  .rname{position:absolute!important;top:50%!important;transform:translateY(-50%)!important;margin:0!important;left:calc(50% + clamp(240px,19vw,300px) * .92 + clamp(36px,4vw,72px));right:clamp(20px,4vw,64px)}
+}
+.rname h2{font-size:clamp(38px,4.8vw,86px)}
+@media (max-width:1100px){.rname h2{font-size:43px}}
 </style>
 </head>
 <body>

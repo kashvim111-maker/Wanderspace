@@ -2372,7 +2372,7 @@ Reply with only a JSON array with one object per photo in the same order:
       $('#reel').style.height = '100vh';
       $('#strip').innerHTML = `<button class="frame add" data-reel="addtrip" aria-label="Add a thumbnail of your recent trip"><span class="ph"><span class="fa-in"><span class="fa-plus"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><b>Add a thumbnail of your recent trip</b><small>Pick the dates, then upload all its photos & videos</small></span></span></button>`;
       $('#camScreen').innerHTML = '<div class="cs-empty">Your first trip goes here</div>';
-      $('#rname').innerHTML = `<div class="swap-in"><h2>Your trips<em>start with the most recent one</em></h2></div>`;
+      $('#rname').innerHTML = `<div class="swap-in"><h2>Your trip album<em>start with the most recent one</em></h2></div>`;
       REEL.cur = -1; $('#strip').style.transform = ''; renderReelCal();
       return;
     }
@@ -2659,10 +2659,8 @@ Reply with only a JSON array with one object per photo in the same order:
   /* ================================================================
      SHELL
      ================================================================ */
-  function renderCounts() {
-    const trips = new Set(S.els.filter(e => e.kind === 'trip' && S.trips[e.tripId]).map(e => e.tripId)).size;
-    $('#c-trips').textContent = trips || '';
-    const n = realMems().length; $('#c-mem').textContent = n || '';
+  function renderCounts() { // tabs never show numbers
+    ['#c-trips', '#c-mem'].forEach(s => { const el = $(s); if (el) { el.textContent = ''; el.hidden = true; } });
   }
   function setTab(tab) {
     S.tab = tab; hidePP();
