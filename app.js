@@ -717,7 +717,7 @@
     const region = t.region ? t.region.split(/[·—,;]/)[0].trim() : '';
     const where = [region, t.country].filter(Boolean).join(', ');
     const tier = IT.btier || 'mid', tiers = t.budgetTiers || {};
-    const busy = t.passBusy || (claudeReady() && !(t.budgetTiers && t.vehicle));
+    const busy = BUSY.has('p' + t.id) || (claudeReady() && !BUSY.has('pt' + t.id) && !(t.budgetTiers && t.vehicle));
     const bval = tiers[tier] || (tier === 'mid' && t.budget) || (busy ? 'Estimating…' : 'Not estimated yet');
     const veh = t.vehicle;
     const vehTxt = veh ? { recommended: 'Yes — bring one', optional: 'Optional', 'not needed': 'Not needed' }[veh.verdict] : (busy ? 'Checking…' : 'Not checked yet');
@@ -726,7 +726,8 @@
     <div class="pbook">
       <button class="icon-btn close pb-close" data-act="close" aria-label="Close passport"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
       <div class="pb-pages">
-        <div class="pb-art" aria-hidden="true">${imgOr(coverSrc(t), t)}</div>
+        <div class="pb-art" aria-hidden="true">${t.landscape ? `<img src="${esc(t.landscape.url)}" alt="">` : imgOr(coverSrc(t), t)}</div>
+        <div class="pb-credit">${landscapeCredit(t)}</div>
         <div class="pb-spine" aria-hidden="true"></div>
         <section class="pb-page pb-left">
           <span class="pb-no">${no}</span>
@@ -750,7 +751,7 @@
         </section>
       </div>
     </div></div>`;
-    fillPassport(t);
+    fillPassport(t); fillLandscape(t);
   }
 
   /* --- planner --- */
@@ -1090,12 +1091,13 @@
       <div class="td-grid">
         <label><span>Destination</span><input data-f="name" value="${esc(t.name)}"></label>
         <label><span>Country</span><input data-f="country" value="${esc(t.country)}"></label>
-        <label><span>Best season</span><input data-f="season" value="${esc(t.season || '')}" placeholder="${t.seasonBusy ? 'Finding the best time to go…' : 'e.g. Oct–Mar'}"></label>
+        <label><span>Best season</span><input data-f="season" value="${esc(t.season || '')}" placeholder="${BUSY.has('s' + t.id) ? 'Finding the best time to go…' : 'e.g. Oct–Mar'}"></label>
         <label><span>Ideal number of days</span><input type="number" min="1" max="60" data-f="days" value="${t.days}"></label>
         <label><span>Budget</span><input data-f="budget" value="${esc(t.budget || '')}" placeholder="e.g. ₹40k / person"></label>
         <label><span>Departure</span><input type="month" data-f="target" value="${esc(t.target || '')}"></label>
       </div>`;
   }
+  const BUSY = new Set(); // in-flight lookups (never saved with the trip)
   /* passport extras: budget at three levels and whether to bring a vehicle */
   function passExtras(t, r) {
     if (!r) return;
@@ -1105,25 +1107,25 @@
     if (r.season && !t.season) t.season = s(r.season, 40);
   }
   async function fillPassport(t) {
-    if ((t.budgetTiers && t.vehicle && t.season) || t.passBusy || !claudeReady()) return;
-    t.passBusy = true;
+    if ((t.budgetTiers && t.vehicle && t.season) || BUSY.has('p' + t.id) || BUSY.has('pt' + t.id) || !claudeReady()) return;
+    BUSY.add('p' + t.id);
     try {
       const home = S.prefs.home && S.prefs.home.country ? `The traveller lives in ${homeLabel()}; use the currency of ${S.prefs.home.country} and include travel from ${S.prefs.home.city || S.prefs.home.country}.` : 'The traveller lives in India; use Indian rupees (₹) and include travel from India.';
       const r = await caps.sample.json(`For a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}. ${home}
 Reply with only JSON: {"season":"best time to go, short","budgetTiers":{"low":"per person, short range","mid":"per person, short range","high":"per person, short range"},"vehicle":{"verdict":"recommended|optional|not needed","note":"max 14 words: why — roads, parking, taxis, public transport"}}`);
       passExtras(t, r); tripChanged(t); persist('trips');
     } catch (e) { /* leave the fields empty */ }
-    t.passBusy = false;
+    BUSY.delete('p' + t.id); BUSY.add('pt' + t.id); // one try per visit
     if (IT.mode === 'pass' && IT.id === t.id && $('.pbook')) renderPassport();
   }
   async function fillSeason(t) { // best season comes from the system, not the user
-    if (t.season || t.seasonBusy || !claudeReady()) return;
-    t.seasonBusy = true;
+    if (t.season || BUSY.has('s' + t.id) || !claudeReady()) return;
+    BUSY.add('s' + t.id);
     try {
       const r = await caps.sample.json(`Best time of year to visit ${t.name}${t.country ? ', ' + t.country : ''} for a trip. Reply with only JSON: {"season":"short, e.g. Oct–Mar"}`);
       if (r && r.season && !t.season) { t.season = String(r.season).slice(0, 40); tripChanged(t); }
     } catch (e) { /* leave it for the user */ }
-    t.seasonBusy = false;
+    BUSY.delete('s' + t.id);
     const inp = document.querySelector('.tdlg input[data-f="season"]'); if (inp && !inp.value) { inp.value = t.season || ''; inp.placeholder = 'e.g. Oct–Mar'; }
   }
   function tripChanged(t, board = true) { persist('trips'); if (board) { const e = S.els.find(x => x.tripId === t.id); if (e) rerenderEl(e); } }
@@ -1161,7 +1163,7 @@ Reply with only JSON: {"season":"best time to go, short","budgetTiers":{"low":"p
     if (act === 'btier') {
       IT.btier = b.dataset.v; const tt = S.trips[IT.id] || {}, tiers = tt.budgetTiers || {};
       $$('.pb-seg button').forEach(x => x.setAttribute('aria-checked', x === b));
-      const v = $('#pbBval'); if (v) { v.classList.remove('flip'); void v.offsetWidth; v.classList.add('flip'); v.textContent = tiers[IT.btier] || (IT.btier === 'mid' && tt.budget) || (tt.passBusy ? 'Estimating…' : 'Not estimated yet'); }
+      const v = $('#pbBval'); if (v) { v.classList.remove('flip'); void v.offsetWidth; v.classList.add('flip'); v.textContent = tiers[IT.btier] || (IT.btier === 'mid' && tt.budget) || (BUSY.has('p' + tt.id) ? 'Estimating…' : 'Not estimated yet'); }
       return;
     }
     if (act === 'notesHide') { t.notesHidden = true; tripChanged(t); return renderItin(); }
@@ -1567,6 +1569,45 @@ Reply with only JSON in exactly this shape:
     })();
     wikiCache.set(q, p); return p;
   }
+  /* a wide landscape photo of the destination for the passport (Wikimedia Commons, credited) */
+  const strip = s => String(s || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  async function landscapePhoto(t) {
+    const tries = [`${t.name} landscape`, `${t.name} ${t.country || ''} view`.trim(), t.name];
+    for (const q of tries) {
+      try {
+        const u = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(q + ' filetype:bitmap')}&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=1800`;
+        const d = await (await fetch(u)).json();
+        const pages = Object.values((d.query && d.query.pages) || {}).sort((x, y) => (x.index || 0) - (y.index || 0));
+        for (const pg of pages) {
+          const ii = pg.imageinfo && pg.imageinfo[0]; if (!ii || !/jpeg|png/.test(ii.mime || '')) continue;
+          if (!(ii.width >= 1400 && ii.width / ii.height >= 1.3 && ii.width / ii.height <= 2.6)) continue; // wide, sharp landscape
+          const md = ii.extmetadata || {}, title = strip(md.ObjectName && md.ObjectName.value) + ' ' + pg.title;
+          if (/map|logo|diagram|flag|plan|chart|svg|poster|stamp/i.test(title)) continue;
+          return { url: ii.thumburl || ii.url, page: ii.descriptionurl, credit: [strip(md.Artist && md.Artist.value).slice(0, 60), strip(md.LicenseShortName && md.LicenseShortName.value)].filter(Boolean).join(' · ') };
+        }
+      } catch (e) { /* try the next search */ }
+    }
+    // fall back to the place's own Wikipedia photo, if it is wide
+    try {
+      const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(t.name + ' ' + (t.country || ''))}&gsrlimit=1&prop=pageimages&piprop=thumbnail&pithumbsize=1800`;
+      const d = await (await fetch(u)).json(); const pg = d.query && Object.values(d.query.pages || {})[0];
+      if (pg && pg.thumbnail && pg.thumbnail.width / pg.thumbnail.height >= 1.2) return { url: pg.thumbnail.source, page: `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title)}`, credit: 'Wikipedia' };
+    } catch (e) { /* none */ }
+    return null;
+  }
+  async function fillLandscape(t) {
+    if (!window.WP_REAL || t.landscape || t.landscapeTried || BUSY.has('l' + t.id)) return; // live site only (the preview can't reach Wikimedia)
+    BUSY.add('l' + t.id);
+    const ph = await landscapePhoto(t);
+    BUSY.delete('l' + t.id); t.landscapeTried = true;
+    if (ph) t.landscape = ph;
+    tripChanged(t); persist('trips');
+    if (ph && IT.mode === 'pass' && IT.id === t.id && $('.pbook')) {
+      const art = $('.pb-art'); if (art) { const im = new Image(); im.onload = () => { art.innerHTML = ''; art.appendChild(im); art.classList.add('in'); }; im.src = ph.url; im.alt = ''; }
+      const cr = $('.pb-credit'); if (cr) { cr.innerHTML = landscapeCredit(t); }
+    }
+  }
+  const landscapeCredit = t => t.landscape ? `Photo: <a href="${esc(t.landscape.page || '#')}" target="_blank" rel="noopener">${esc(t.landscape.credit || 'Wikimedia Commons')}</a> · Wikimedia Commons` : '';
   async function findImages(t) {
     const jobs = [];
     (t.itinerary || []).forEach(d => d.items.forEach(it => { if (!it.img && it.cat !== 'stay') jobs.push(async () => { const im = await wikiImage(`${it.name} ${t.name}`); if (im) it.img = im; }); }));
