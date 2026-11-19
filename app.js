@@ -818,7 +818,7 @@
     const tabs = [['route', 'Route & itinerary'], ['places', 'Places to visit'], ['check', 'Checklist']];
     const has = (t.itinerary || []).length || (t.places || []).length;
     const fresh = !$('.planner');
-    $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Plan ${esc(t.name)}">
+    const html = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Plan ${esc(t.name)}">
     <div class="planner${fresh ? ' enter' : ''}">
       <div class="pl-bg">${imgOr(sceneSrc(t), t)}</div>
       <header class="pl-head">
@@ -839,7 +839,22 @@
       ${IT.err ? `<div class="pl-note err">${esc(IT.err)}</div>` : ''}
       <div class="pl-body"><div class="pane">${planBody(t)}</div></div>
     </div></div>`;
+    if (fresh) $('#modal').innerHTML = html;
+    else { const tpl = document.createElement('div'); tpl.innerHTML = html; morph($('#modal'), tpl); } // only what changed is touched — no flash
     if (IT.tab === 'route' && !IT.busy) wireJourney(t);
+  }
+  // minimal DOM patch: keeps existing elements (images stay loaded, focus and typing stay put)
+  function morph(a, b) {
+    if (a.nodeType !== b.nodeType || a.nodeName !== b.nodeName) { a.replaceWith(b.cloneNode(true)); return; }
+    if (a.nodeType === 3 || a.nodeType === 8) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+    if (a.nodeType === 1 && a.id !== 'modal') {
+      for (const at of [...a.attributes]) if (!b.hasAttribute(at.name) && at.name !== 'data-wired' && at.name !== 'style') a.removeAttribute(at.name);
+      for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+      if (a.classList.contains('leaving')) return;
+    }
+    const ac = [...a.childNodes], bc = [...b.childNodes];
+    bc.forEach((n, i) => { if (ac[i]) morph(ac[i], n); else a.appendChild(n.cloneNode(true)); });
+    for (let i = bc.length; i < ac.length; i++) ac[i].remove();
   }
   // tabs slide between each other (no re-render flash); jumping two tabs goes straight there
   const TAB_ORDER = ['route', 'places', 'check'];
@@ -1025,6 +1040,7 @@
     const cur = clamp(IT.day, 0, t.itinerary.length);
     if (IT.animate) { IT.animate = false; requestAnimationFrame(() => requestAnimationFrame(() => setSlide(cur, false))); }
     else $$('.jslide', jr).forEach(sl => sl.classList.toggle('on', +sl.dataset.slide === cur)), jr.classList.add('settled');
+    if (jr.dataset.wired) return; jr.dataset.wired = '1';
     const go = dir => { const now = Date.now(); if (now < jLock) return; jLock = now + 1150; setSlide(IT.day + dir); };
     jr.addEventListener('wheel', ev => {
       if (ev.target.closest('.dpanel, .jresults')) return;
@@ -1079,7 +1095,14 @@
           <button class="pdone" data-act="pdone2" data-i="${k}" aria-pressed="${!!p.done}" title="${p.done ? 'Visited' : 'Mark as visited'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button>
           <button class="pdel" data-act="delplace" data-i="${k}" aria-label="Remove ${esc(p.name)}">×</button></div>
         <div class="pbody"><b>${esc(p.name)}</b><small>${esc([p.area, p.note].filter(Boolean).join(' · '))}</small>${p.ok || p.ll ? `<a class="pmap" href="${esc(mapsUrl(p))}" target="_blank" rel="noopener">${ico('pin', 11, 2.2)}Open in Google Maps</a>` : ''}</div></article>`; }).join('') || '<div class="empty-state">Save places here as you find them.</div>'}</div>
-      <form class="addrow" data-form="place" style="margin-top:18px"><input class="grow" name="name" placeholder="Add a place to visit" required aria-label="Place name"><input name="area" placeholder="Area" style="width:140px" aria-label="Area"><select name="cat" aria-label="Category">${catOptions('cafe')}</select><button class="btn btn-ghost btn-sm">Save place</button></form>`;
+      <form class="addplace" data-form="place">
+        <div class="ap-h"><b>Add a place</b><span>Somewhere you heard about? Save it to this trip.</span></div>
+        <div class="ap-row">
+          <label class="ap-f ap-name"><span>Place name <i aria-hidden="true">*</i></span><input name="name" required autocomplete="off" placeholder="e.g. Beatles Ashram"></label>
+          <label class="ap-f"><span>Area <em>optional</em></span><input name="area" autocomplete="off" placeholder="e.g. Tapovan"></label>
+          <label class="ap-f"><span>Type</span><select name="cat">${catOptions('see')}</select></label>
+          <button class="btn ap-save">${ico('pin', 15, 2.2)}Save place</button>
+        </div></form>`;
   }
   function checkHTML(t) {
     const cl = t.checklist || [];
@@ -1145,6 +1168,16 @@ Reply with only JSON: {"season":"best time to go, short","budgetTiers":{"low":"p
     if (act === 'plan') return openItin(t.id, 'route');
     if (act === 'toPass') return openPassport(t.id);
     if (act === 'menu') { IT.menu = !IT.menu; return renderItin(); }
+    if (act === 'pcat') {
+      if (IT.pcat === b.dataset.v) return;
+      const order = ['all'].concat(CAT_ORDER), dir = order.indexOf(b.dataset.v) > order.indexOf(IT.pcat) ? 1 : -1;
+      IT.pcat = b.dataset.v;
+      $$('.pfilter button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      const g = $('.pgrid2'); if (!g) return renderItin();
+      g.style.setProperty('--dir', dir); g.classList.add('pg-out');
+      setTimeout(() => { renderItin(); const g2 = $('.pgrid2'); if (!g2) return; g2.style.setProperty('--dir', dir); g2.classList.remove('pg-out'); g2.classList.add('pg-in'); requestAnimationFrame(() => requestAnimationFrame(() => g2.classList.remove('pg-in'))); }, 220);
+      return;
+    }
     if (act === 'editInfo') { IT.menu = false; IT.edit = true; return renderItin(); }
     if (act === 'editClose') { IT.edit = false; return renderItin(); }
     if (act === 'tab') return switchTab(b.dataset.v);
@@ -1201,7 +1234,10 @@ Reply with only JSON: {"season":"best time to go, short","budgetTiers":{"low":"p
       if (form.dataset.form === 'stop') { t.itinerary[+form.dataset.d].items.push({ t: fd.t || '', name: fd.name.trim(), cat: fd.cat }); t.itinerary[+form.dataset.d].items.sort((a, b) => (a.t || '99').localeCompare(b.t || '99')); }
       if (form.dataset.form === 'place') (t.places = t.places || []).push({ cat: fd.cat, name: fd.name.trim(), area: (fd.area || '').trim(), note: '', done: false });
       if (form.dataset.form === 'ck') (t.checklist = t.checklist || []).push({ t: fd.t.trim(), done: false });
+      const keepCat = form.elements.cat && form.elements.cat.value;
+      form.reset(); if (keepCat && form.elements.cat) form.elements.cat.value = keepCat; // clear the fields (the planner now updates in place)
       tripChanged(t, false); renderItin();
+      if (form.dataset.form === 'place') toast(`Saved “${fd.name.trim()}” to places to visit.`);
       const again = $(`form[data-form="${form.dataset.form}"]${form.dataset.d ? `[data-d="${form.dataset.d}"]` : ''} input[name="${form.dataset.form === 'ck' ? 't' : 'name'}"]`);
       again?.focus();
     }
