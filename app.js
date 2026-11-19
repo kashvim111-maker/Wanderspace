@@ -1571,32 +1571,50 @@ Reply with only JSON in exactly this shape:
   }
   /* a wide landscape photo of the destination for the passport (Wikimedia Commons, credited) */
   const strip = s => String(s || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  // Picks a recognised, high-quality photo that is clearly of this place, in this order:
+  // 1. a Wikimedia Commons Featured or Quality image (community-reviewed) with the place's name in its title
+  // 2. the lead photo of the place's Wikipedia article (chosen by its editors), if it is wide
+  // 3. another photo from that article with the place's name in its title
+  const SCENIC = /view|skyline|panorama|ghat|river|ganga|ganges|landscape|sunset|sunrise|dusk|night|temple|fort|palace|bridge|jhula|lake|hill|mountain|valley|beach|coast|harbou?r|old town|cityscape|aerial|from above|street|square|castle|cathedral|shrine|pagoda|garden|waterfall|falls|bay|tower|monument|mahal|bazaar|market|ganj|bagh|peak|glacier|desert|dune|island/i;
+  const NOT_SCENE = /woman|women|ladies|\bman\b|\bmen\b|girl|boy|child|portrait|people|crowd|bird|butterfly|insect|moth|beetle|spider|dog|cat\b|pig|cow|monkey|zoo|flower|leaf|mushroom|food|dish|interior|inside|detail|logo|map|flag|seal|emblem|signature|locator|icon|coat of arms|diagram|chart|graph|airport|train|bus\b|station|campus|university|press|office|hospital|ticket/i;
+  const COMMONS = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*';
+  const wideOk = (ii, min = 1400) => ii && /jpeg|png/.test(ii.mime || '') && ii.width >= min && ii.width / ii.height >= 1.25 && ii.width / ii.height <= 2.8;
+  async function fileDetails(title) {
+    const d = await (await fetch(`${COMMONS}&titles=${encodeURIComponent(title)}&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=2000`)).json();
+    const pg = Object.values((d.query && d.query.pages) || {})[0], ii = pg && pg.imageinfo && pg.imageinfo[0];
+    if (!ii) return null;
+    const md = ii.extmetadata || {};
+    return { url: ii.thumburl || ii.url, page: ii.descriptionurl, w: ii.width, h: ii.height, mime: ii.mime, title: pg.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, ''),
+      credit: [strip(md.Artist && md.Artist.value).slice(0, 60), strip(md.LicenseShortName && md.LicenseShortName.value)].filter(Boolean).join(' · ') };
+  }
   async function landscapePhoto(t) {
-    const tries = [`${t.name} landscape`, `${t.name} ${t.country || ''} view`.trim(), t.name];
-    for (const q of tries) {
-      try {
-        const u = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(q + ' filetype:bitmap')}&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=1800`;
-        const d = await (await fetch(u)).json();
-        const pages = Object.values((d.query && d.query.pages) || {}).sort((x, y) => (x.index || 0) - (y.index || 0));
-        for (const pg of pages) {
-          const ii = pg.imageinfo && pg.imageinfo[0]; if (!ii || !/jpeg|png/.test(ii.mime || '')) continue;
-          if (!(ii.width >= 1400 && ii.width / ii.height >= 1.3 && ii.width / ii.height <= 2.6)) continue; // wide, sharp landscape
-          const md = ii.extmetadata || {}, title = strip(md.ObjectName && md.ObjectName.value) + ' ' + pg.title;
-          if (/map|logo|diagram|flag|plan|chart|svg|poster|stamp/i.test(title)) continue;
-          return { url: ii.thumburl || ii.url, page: ii.descriptionurl, credit: [strip(md.Artist && md.Artist.value).slice(0, 60), strip(md.LicenseShortName && md.LicenseShortName.value)].filter(Boolean).join(' · ') };
-        }
-      } catch (e) { /* try the next search */ }
-    }
-    // fall back to the place's own Wikipedia photo, if it is wide
-    try {
-      const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(t.name + ' ' + (t.country || ''))}&gsrlimit=1&prop=pageimages&piprop=thumbnail&pithumbsize=1800`;
-      const d = await (await fetch(u)).json(); const pg = d.query && Object.values(d.query.pages || {})[0];
-      if (pg && pg.thumbnail && pg.thumbnail.width / pg.thumbnail.height >= 1.2) return { url: pg.thumbnail.source, page: `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title)}`, credit: 'Wikipedia' };
+    const name = String(t.name || '').trim(); if (!name) return null;
+    const hasName = s => fold(s).includes(fold(name));
+    try { // 1. community-certified photos
+      for (const [cat, label] of [['Featured_pictures_on_Wikimedia_Commons', 'Featured picture'], ['Quality_images', 'Quality image']]) {
+        const d = await (await fetch(`${COMMONS}&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch=${encodeURIComponent(`intitle:"${name}" incategory:${cat}`)}&prop=imageinfo&iiprop=size|mime`)).json();
+        const pick = Object.values((d.query && d.query.pages) || {}).sort((x, y) => (x.index || 0) - (y.index || 0))
+          .find(pg => wideOk(pg.imageinfo && pg.imageinfo[0], 1600) && hasName(pg.title) && SCENIC.test(pg.title) && !NOT_SCENE.test(pg.title));
+        if (pick) { const f = await fileDetails(pick.title); if (f) return { ...f, badge: label }; }
+      }
+    } catch (e) { /* next */ }
+    try { // 2 & 3. the place's Wikipedia article
+      const q = `${name}${t.country && !hasName(t.country) ? '' : ''}`;
+      const pp = await (await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&titles=${encodeURIComponent(q)}&prop=pageprops`)).json();
+      const page = Object.values((pp.query && pp.query.pages) || {})[0] || {};
+      const lead = page.pageprops && (page.pageprops.page_image_free || page.pageprops.page_image);
+      if (lead && !NOT_SCENE.test(lead)) { const f = await fileDetails('File:' + lead); if (f && wideOk(f, 1000)) return { ...f, badge: 'Wikipedia lead photo' }; }
+      if (page.title) {
+        const d = await (await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&titles=${encodeURIComponent(page.title)}&generator=images&gimlimit=80&prop=imageinfo&iiprop=size|mime`)).json();
+        const list = Object.values((d.query && d.query.pages) || {}).filter(pg => wideOk(pg.imageinfo && pg.imageinfo[0]) && hasName(pg.title) && !NOT_SCENE.test(pg.title));
+        list.sort((x, y) => (SCENIC.test(y.title) - SCENIC.test(x.title)) || (y.imageinfo[0].width - x.imageinfo[0].width));
+        if (list[0]) { const f = await fileDetails(list[0].title); if (f) return { ...f, badge: 'From Wikipedia' }; }
+      }
     } catch (e) { /* none */ }
     return null;
   }
   async function fillLandscape(t) {
-    if (!window.WP_REAL || t.landscape || t.landscapeTried || BUSY.has('l' + t.id)) return; // live site only (the preview can't reach Wikimedia)
+    if (!window.WP_REAL || (t.landscape && t.landscape.badge) || (t.landscapeTried && !t.landscape) || BUSY.has('l' + t.id)) return; // live site only (the preview can't reach Wikimedia)
     BUSY.add('l' + t.id);
     const ph = await landscapePhoto(t);
     BUSY.delete('l' + t.id); t.landscapeTried = true;
@@ -1607,7 +1625,13 @@ Reply with only JSON in exactly this shape:
       const cr = $('.pb-credit'); if (cr) { cr.innerHTML = landscapeCredit(t); }
     }
   }
-  const landscapeCredit = t => t.landscape ? `Photo: <a href="${esc(t.landscape.page || '#')}" target="_blank" rel="noopener">${esc(t.landscape.credit || 'Wikimedia Commons')}</a> · Wikimedia Commons` : '';
+  const photoCaption = t => {
+    let s = String((t.landscape && t.landscape.title) || '').replace(/_/g, ' ');
+    for (let i = 0; i < 4; i++) s = s.replace(/[\s,(-]+(\d{1,4}|[A-Z]{1,3}|\d{4}-\d{2}(-\d{2})?|by [^,]+|January|February|March|April|May|June|July|August|September|October|November|December|January|February|March|April|May|June|July|August|September|October|November|December|\(\d+\))\)?$/, '').trim();
+    if (s && !fold(s).includes(fold(t.name))) s += ', ' + t.name;
+    return s;
+  };
+  const landscapeCredit = t => t.landscape ? `${photoCaption(t) ? esc(photoCaption(t)) + ' — ' : ''}Photo: <a href="${esc(t.landscape.page || '#')}" target="_blank" rel="noopener">${esc(t.landscape.credit || 'Wikimedia Commons')}</a> · Wikimedia Commons` : '';
   async function findImages(t) {
     const jobs = [];
     (t.itinerary || []).forEach(d => d.items.forEach(it => { if (!it.img && it.cat !== 'stay') jobs.push(async () => { const im = await wikiImage(`${it.name} ${t.name}`); if (im) it.img = im; }); }));
