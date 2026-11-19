@@ -695,6 +695,7 @@
   const IT = { id: null, mode: null, tab: 'route', day: -1, panel: false, busy: false, confirm: false, err: '' };
   function closeModal() { const back = LB && typeof REEL !== 'undefined' && REEL.gal; $('#modal').innerHTML = ''; IT.id = null; IT.mode = null; LB = null; renderMem(); if (back) openTripGallery(REEL.gal); }
   function claudeReady() { return !!caps.sample; }
+  const sceneSrc = t => (t.landscape && t.landscape.url) || coverSrc(t); // the fetched landscape photo, if any
   const coverSrc = t => t.img || (SEED.trips[t.id] && SEED.trips[t.id].img) || null;
   function seedDay(t, i) { const s = SEED.trips[t.id], d = (t.itinerary || [])[i]; return s && d && s.itinerary[i] && s.itinerary[i].title === d.title ? s.itinerary[i] : null; }
   const dayImg = (t, i) => ((t.itinerary || [])[i] || {}).img || (seedDay(t, i) || {}).img || coverSrc(t);
@@ -819,7 +820,7 @@
     const fresh = !$('.planner');
     $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Plan ${esc(t.name)}">
     <div class="planner${fresh ? ' enter' : ''}">
-      <div class="pl-bg">${imgOr(coverSrc(t), t)}</div>
+      <div class="pl-bg">${imgOr(sceneSrc(t), t)}</div>
       <header class="pl-head">
         <button class="icon-btn" data-act="toPass" aria-label="Back to passport"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M8 1 L3 6 L8 11" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
         <div class="pl-title"><span class="nm">${esc(t.name)}</span><span class="mono">${esc(t.country)}${t.country ? ' · ' : ''}${t.days} days</span></div>
@@ -880,10 +881,11 @@
     const la0 = Math.min(...lats), la1 = Math.max(...lats);
     const r = rng(t.id);
     const pts = t.itinerary.map((_, i) => {
-      const x = n === 1 ? 500 : 120 + (760 * i) / (n - 1);
+      const x = n === 1 ? 480 : 120 + (720 * i) / (n - 1);
       const geo = lls[i] && la1 > la0 ? (la1 - lls[i][0]) / (la1 - la0) - .5 : r() - .5;
-      const base = n <= 3 ? 300 : (i % 2 ? 330 : 190);
-      return { x, y: base + geo * 40, below: false };
+      // cards hang above their pin, so even the top row starts below the search bar
+      const base = n <= 3 ? 370 : (i % 2 ? 455 : 300);
+      return { x, y: base + geo * 30, below: false };
     });
     return { pts, lls };
   }
@@ -980,11 +982,11 @@
   }
   function routeHTML(t) {
     const days = t.itinerary || [];
-    if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(coverSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? '<button class="btn btn-lilac" data-act="draft">Draft with Wander Board</button>' : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
+    if (!days.length) return `<div class="journey"><section class="jslide on"><div class="jbg">${imgOr(sceneSrc(t), t)}</div><div class="map-empty light"><h3>No route yet</h3><p>${claudeReady() ? 'Let Claude draft a day-by-day plan with photos, routes and how to get around.' : 'Add days and stops to see your route here.'}</p><div style="display:flex;gap:8px;justify-content:center">${claudeReady() ? '<button class="btn btn-lilac" data-act="draft">Draft with Wander Board</button>' : ''}<button class="btn btn-white" data-act="addday">Add a day</button></div></div></section></div>`;
     const N = days.length + 1, cur = clamp(IT.day, 0, N - 1);
     const notes = planNotes(t);
     return `<div class="journey${IT.panel ? ' panel-open' : ''}" tabindex="-1">
-      <div class="jbg jbg-fixed">${imgOr(coverSrc(t), t)}</div>
+      <div class="jbg jbg-fixed">${imgOr(sceneSrc(t), t)}</div>
       <div class="jstage">
       <div class="jtrack" style="transform:translateY(${-cur * 100}%)">${days.map((_, i) => daySlide(t, i)).join('')}${overviewSlide(t)}</div>
       ${notes.length ? `<button class="jinfo" data-act="notesPop" aria-expanded="false" aria-label="About this plan" title="About this plan">${ico('info', 18, 2.2)}</button>
