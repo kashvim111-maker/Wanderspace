@@ -1659,6 +1659,11 @@ body{font-synthesis-weight:none}
 .pb-credit a{color:inherit}
 .pb-art.in img{animation:artIn .9s ease}
 @keyframes artIn{from{opacity:0}to{opacity:.92}}
+
+/* passport photo in its real colours — no sepia, no blend */
+.pb-art img,.pb-art svg{filter:none!important;mix-blend-mode:normal!important;opacity:1!important}
+.pb-art.in img{animation:artInFull .9s ease}
+@keyframes artInFull{from{opacity:0}to{opacity:1}}
 </style>
 </head>
 <body>
