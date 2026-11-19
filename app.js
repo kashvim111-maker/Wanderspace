@@ -714,25 +714,43 @@
   function openPassport(id) { if (!S.trips[id]) return; hidePP(); Object.assign(IT, { id, mode: 'pass', confirm: false, err: '' }); renderPassport(); }
   function renderPassport() {
     const t = S.trips[IT.id]; if (!t) return closeModal();
-    const hl = highlights(t);
+    const region = t.region ? t.region.split(/[·—,;]/)[0].trim() : '';
+    const where = [region, t.country].filter(Boolean).join(', ');
+    const tier = IT.btier || 'mid', tiers = t.budgetTiers || {};
+    const busy = t.passBusy || (claudeReady() && !(t.budgetTiers && t.vehicle));
+    const bval = tiers[tier] || (tier === 'mid' && t.budget) || (busy ? 'Estimating…' : 'Not estimated yet');
+    const veh = t.vehicle;
+    const vehTxt = veh ? { recommended: 'Yes — bring one', optional: 'Optional', 'not needed': 'Not needed' }[veh.verdict] : (busy ? 'Checking…' : 'Not checked yet');
+    const no = String(Math.abs([...t.name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)) % 80 + 10);
     $('#modal').innerHTML = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="${esc(t.name)} passport">
-    <div class="pass">
-      <div class="pass-photo">${imgOr(coverSrc(t), t)}${credit(t)}
-        <div class="pass-name"><span class="mono">${esc(t.country)}${t.region ? ' · ' + esc(t.region.split(/[·—,]/)[0].trim()) : ''}</span><span class="nm">${esc(t.name)}</span></div></div>
-      <div class="pass-stamp">${destStamp(t)}</div>
-      <div class="pass-page">
-        <button class="icon-btn close" data-act="close" aria-label="Close passport"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
-        <div class="pp-top"><span>PASSPORT · PASSEPORT</span><span>P · ${esc(t.cc || '—')}</span></div>
-        <div class="pass-f"><div class="k">Best places to visit</div>${hl.length ? `<ol class="hl">${hl.map(h => `<li>${esc(h)}</li>`).join('')}</ol>` : '<div class="v muted">Plan the trip to fill this in</div>'}</div>
-        <div class="pass-row">
-          <div class="pass-f"><div class="k">Best season</div><div class="v">${esc(t.season || 'Any time')}</div></div>
-          <div class="pass-f"><div class="k">Ideal trip</div><div class="v big">${t.days}<small> days</small></div></div>
-        </div>
-        <div class="pass-f"><div class="k">Budget</div><div class="v">${esc(t.budget || 'Not estimated yet')}</div></div>
-        <button class="btn btn-dark plan-btn" data-act="plan">Plan your trip <span aria-hidden="true">→</span></button>
-        <div class="mrz">${mrz(t)}</div>
+    <div class="pbook">
+      <button class="icon-btn close pb-close" data-act="close" aria-label="Close passport"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
+      <div class="pb-pages">
+        <div class="pb-art" aria-hidden="true">${imgOr(coverSrc(t), t)}</div>
+        <div class="pb-spine" aria-hidden="true"></div>
+        <section class="pb-page pb-left">
+          <span class="pb-no">${no}</span>
+          <div class="pb-stamp">${destStamp(t)}</div>
+          <h2 class="pb-title">${esc(t.name)}</h2>
+          ${where ? `<p class="pb-where">${ico('pin', 13, 2)}${esc(where)}</p>` : ''}
+          ${t.tagline ? `<p class="pb-tag">${esc(t.tagline)}</p>` : ''}
+        </section>
+        <section class="pb-page pb-right">
+          <span class="pb-no r">${+no + 1}</span>
+          <h3 class="pb-h">Travel notes</h3>
+          <dl class="pb-notes">
+            <div><dt>Best season</dt><dd>${esc(t.season || (busy ? 'Finding out…' : 'Any time'))}</dd></div>
+            <div><dt>Ideal trip</dt><dd><b>${t.days}</b> ${t.days === 1 ? 'day' : 'days'}</dd></div>
+            <div class="pb-budget"><dt>Budget <span class="pb-per">per person</span></dt>
+              <dd><div class="pb-seg" role="radiogroup" aria-label="Budget level">${[['low', 'Budget'], ['mid', 'Mid-range'], ['high', 'Luxury']].map(([k, l]) => `<button role="radio" aria-checked="${k === tier}" data-act="btier" data-v="${k}">${l}</button>`).join('')}</div>
+              <span class="pb-bval" id="pbBval">${esc(bval)}</span></dd></div>
+            <div><dt>Bring a vehicle?</dt><dd><span class="pb-veh ${veh ? 'v-' + veh.verdict.replace(' ', '-') : ''}">${esc(vehTxt)}</span>${veh && veh.note ? `<small>${esc(veh.note)}</small>` : ''}</dd></div>
+          </dl>
+          <button class="btn btn-dark plan-btn pb-plan" data-act="plan">Plan your trip <span aria-hidden="true">→</span></button>
+        </section>
       </div>
     </div></div>`;
+    fillPassport(t);
   }
 
   /* --- planner --- */
@@ -1078,6 +1096,26 @@
         <label><span>Departure</span><input type="month" data-f="target" value="${esc(t.target || '')}"></label>
       </div>`;
   }
+  /* passport extras: budget at three levels and whether to bring a vehicle */
+  function passExtras(t, r) {
+    if (!r) return;
+    const s = (v, n = 60) => String(v ?? '').slice(0, n);
+    if (r.budgetTiers && (r.budgetTiers.low || r.budgetTiers.mid || r.budgetTiers.high)) t.budgetTiers = { low: s(r.budgetTiers.low), mid: s(r.budgetTiers.mid), high: s(r.budgetTiers.high) };
+    if (r.vehicle && r.vehicle.verdict) t.vehicle = { verdict: /recommend/i.test(r.vehicle.verdict) ? 'recommended' : /not/i.test(r.vehicle.verdict) ? 'not needed' : 'optional', note: s(r.vehicle.note, 120) };
+    if (r.season && !t.season) t.season = s(r.season, 40);
+  }
+  async function fillPassport(t) {
+    if ((t.budgetTiers && t.vehicle && t.season) || t.passBusy || !claudeReady()) return;
+    t.passBusy = true;
+    try {
+      const home = S.prefs.home && S.prefs.home.country ? `The traveller lives in ${homeLabel()}; use the currency of ${S.prefs.home.country} and include travel from ${S.prefs.home.city || S.prefs.home.country}.` : 'The traveller lives in India; use Indian rupees (₹) and include travel from India.';
+      const r = await caps.sample.json(`For a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}. ${home}
+Reply with only JSON: {"season":"best time to go, short","budgetTiers":{"low":"per person, short range","mid":"per person, short range","high":"per person, short range"},"vehicle":{"verdict":"recommended|optional|not needed","note":"max 14 words: why — roads, parking, taxis, public transport"}}`);
+      passExtras(t, r); tripChanged(t); persist('trips');
+    } catch (e) { /* leave the fields empty */ }
+    t.passBusy = false;
+    if (IT.mode === 'pass' && IT.id === t.id && $('.pbook')) renderPassport();
+  }
   async function fillSeason(t) { // best season comes from the system, not the user
     if (t.season || t.seasonBusy || !claudeReady()) return;
     t.seasonBusy = true;
@@ -1120,6 +1158,12 @@
     if (act === 'delck') { t.checklist.splice(+b.dataset.i, 1); tripChanged(t, false); return renderItin(); }
     if (act === 'draft') { if ((t.itinerary || []).length || (t.places || []).length) { IT.confirm = true; return renderItin(); } return draftTrip(t); }
     if (act === 'draftGo') { IT.confirm = false; return draftTrip(t); }
+    if (act === 'btier') {
+      IT.btier = b.dataset.v; const tt = S.trips[IT.id] || {}, tiers = tt.budgetTiers || {};
+      $$('.pb-seg button').forEach(x => x.setAttribute('aria-checked', x === b));
+      const v = $('#pbBval'); if (v) { v.classList.remove('flip'); void v.offsetWidth; v.classList.add('flip'); v.textContent = tiers[IT.btier] || (IT.btier === 'mid' && tt.budget) || (tt.passBusy ? 'Estimating…' : 'Not estimated yet'); }
+      return;
+    }
     if (act === 'notesHide') { t.notesHidden = true; tripChanged(t); return renderItin(); }
     if (act === 'notesShow') { t.notesHidden = false; tripChanged(t); return renderItin(); }
     if (act === 'reqPaid' || act === 'reqMore') { return openLimit('limit', null); }
@@ -1207,7 +1251,7 @@
     const prompt = `Plan a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.region ? ` (areas: ${t.region})` : ''}${t.target ? `, travelling around ${fmtMonth(t.target).toLowerCase()}` : ''}. ${S.prefs.home && S.prefs.home.country ? `The traveller lives in ${homeLabel()}; give budgets in the currency of ${S.prefs.home.country}, per person, including travel from ${S.prefs.home.city || S.prefs.home.country}.` : 'The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.'}
 Use real, currently operating places only — specific named cafés, restaurants, temples, museums, viewpoints, nature spots and experiences. Group each day geographically so it is walkable or a short ride.
 Reply with only JSON in exactly this shape:
-{"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","tagline":"max 12 words, evocative",
+{"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","budgetTiers":{"low":"backpacker per person, e.g. ₹15k–20k","mid":"comfortable per person","high":"luxury per person"},"vehicle":{"verdict":"recommended|optional|not needed","note":"max 14 words: why, e.g. hill roads, parking, good taxis"},"tagline":"max 12 words, evocative",
 "itinerary":[{"title":"short theme for the day","lat":0.0,"lon":0.0,"items":[{"t":"HH:MM","name":"specific place or activity","cat":"see|temple|cafe|eat|nature|do|stay","go":"walk|bus|train|car|boat","mins":15}]}],
 "places":[{"cat":"cafe|eat|temple|see|nature|do|stay","name":"","area":"neighbourhood or town","note":"max 8 words"}],
 "checklist":["short pre-trip task, e.g. visa, permits, bookings"]}
@@ -1216,7 +1260,7 @@ Reply with only JSON in exactly this shape:
       const res = await caps.sample.json(prompt, { modelTier: 'default' });
       const c = cleanTrip(res || {});
       if (!c.itinerary.length) throw { message: 'empty' };
-      Object.assign(t, c);
+      Object.assign(t, c); passExtras(t, res);
       ['country', 'region', 'season', 'budget', 'tagline', 'airport'].forEach(k => { if (res[k]) t[k] = String(res[k]).slice(0, 120); });
       if (res.countryCode) t.cc = String(res.countryCode).slice(0, 2).toUpperCase();
       if (t.status === 'dreaming') t.status = 'planning';
@@ -1390,7 +1434,7 @@ Reply with only JSON in exactly this shape:
     return `Plan the first ${Math.min(t.days, 5)} days of a ${t.days}-day trip to ${t.name}${t.country ? ', ' + t.country : ''}${t.ll ? ` (around ${t.ll[0].toFixed(2)}, ${t.ll[1].toFixed(2)})` : ''}. ${S.prefs.home && S.prefs.home.country ? `The traveller lives in ${homeLabel()}; give budgets in the currency of ${S.prefs.home.country}, per person, including travel from ${S.prefs.home.city || S.prefs.home.country}.` : 'The traveller lives in India; give budgets in Indian rupees (₹), per person, including flights from India.'}
 Use real, currently operating places only — specific named cafés, restaurants, temples, museums, viewpoints, nature spots and experiences. Group each day geographically so it is walkable or a short ride.
 Reply with only JSON in exactly this shape:
-{"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","tagline":"max 12 words, evocative",
+{"country":"","countryCode":"ISO alpha-2","airport":"IATA code of the main arrival airport","region":"main areas or states, short","season":"best time to go, short","budget":"e.g. ₹80k–1L / person","budgetTiers":{"low":"backpacker per person, e.g. ₹15k–20k","mid":"comfortable per person","high":"luxury per person"},"vehicle":{"verdict":"recommended|optional|not needed","note":"max 14 words: why, e.g. hill roads, parking, good taxis"},"tagline":"max 12 words, evocative",
 "itinerary":[{"title":"short theme for the day","lat":0.0,"lon":0.0,"items":[{"t":"HH:MM","name":"specific place or activity","cat":"see|temple|cafe|eat|nature|do|stay","go":"walk|bus|train|car|boat","mins":15}]}],
 "places":[{"cat":"cafe|eat|temple|see|nature|do|stay","name":"","area":"neighbourhood or town","note":"max 8 words"}],
 "checklist":["short pre-trip task, e.g. visa, permits, bookings"],
@@ -1484,7 +1528,7 @@ Reply with only JSON in exactly this shape:
           } catch (e) { /* keep the unchecked plan */ }
         }
         const c = cleanTrip(res || {}); if (!c.itinerary.length) throw {};
-        Object.assign(t, c);
+        Object.assign(t, c); passExtras(t, res);
         t.precautions = Array.isArray(res.precautions) ? res.precautions.slice(0, 8).map(x => String(x).slice(0, 120)) : [];
         ['country', 'region', 'season', 'budget', 'tagline', 'airport'].forEach(k => { if (res[k]) t[k] = String(res[k]).slice(0, 120); });
         if (res.countryCode) t.cc = String(res.countryCode).slice(0, 2).toUpperCase();
