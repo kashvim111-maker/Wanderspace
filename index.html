@@ -1798,6 +1798,12 @@ body{font-synthesis-weight:none}
   .pcat-b{max-width:calc(100% - 52px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px!important}
   .jpager{transform:scale(.86);transform-origin:right center}
 }
+/* text panel: font list rows fully visible, panel clears the account chip */
+.tpanel{overflow-y:auto;overscroll-behavior:contain}
+.tp-fonts{display:flex!important;flex-direction:column;flex:1 0 210px!important;min-height:210px!important;gap:2px}
+.tp-font{flex:none;line-height:1.45!important;min-height:42px;padding:7px 12px!important;display:flex;align-items:center}
+body:has(.acct) .tpanel{bottom:80px}
+@media (max-width:700px){body:has(.acct) .tpanel{bottom:80px;height:auto;top:96px}}
 </style>
 </head>
 <body>
