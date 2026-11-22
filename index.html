@@ -1699,6 +1699,12 @@ body{font-synthesis-weight:none}
 .pb-spine{background:linear-gradient(90deg,rgba(30,30,40,0) 0%,rgba(30,30,40,.06) 42%,rgba(30,30,40,.14) 50%,rgba(30,30,40,.06) 58%,rgba(30,30,40,0) 100%)!important}
 .pb-right{background:linear-gradient(180deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.92) 62%,rgba(255,255,255,0) 86%)!important}
 .pb-seg{background:rgba(30,30,40,.05)!important;border-color:rgba(30,30,40,.14)!important}
+/* checklist + precautions side by side */
+.ckgrid{width:min(1120px,100%);display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+.ckgrid.one{width:min(560px,100%);grid-template-columns:1fr}
+.ckgrid .cklist{width:auto;min-width:0}
+.precard .prec{margin-top:4px}
+@media (max-width:900px){.ckgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>

@@ -1106,10 +1106,10 @@
   }
   function checkHTML(t) {
     const cl = t.checklist || [];
-    return `<div class="cklist"><h3>Checklist</h3><p class="note">${cl.filter(c => c.done).length} of ${cl.length} done</p>
+    return `<div class="ckgrid ${(t.precautions || []).length ? '' : 'one'}"><div class="cklist"><h3>Checklist</h3><p class="note">${cl.filter(c => c.done).length} of ${cl.length} done</p>
       ${cl.map((c, i) => `<div class="ck ${c.done ? 'done' : ''}"><input type="checkbox" id="ck${i}" data-act="ckdone" data-i="${i}" ${c.done ? 'checked' : ''}><label for="ck${i}">${esc(c.t)}</label><button class="x" data-act="delck" data-i="${i}" aria-label="Remove ${esc(c.t)}">×</button></div>`).join('')}
-      <form class="addrow ckadd" data-form="ck"><input class="grow" name="t" placeholder="Add something to sort out before you go" required aria-label="Checklist item"><button class="btn btn-ghost btn-sm">Add</button></form>
-      ${(t.precautions || []).length ? `<h3 class="prec-h">Precautions</h3><ul class="prec">${t.precautions.map(x => `<li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+      <form class="addrow ckadd" data-form="ck"><input class="grow" name="t" placeholder="Add something to sort out before you go" required aria-label="Checklist item"><button class="btn btn-ghost btn-sm">Add</button></form></div>
+      ${(t.precautions || []).length ? `<div class="cklist precard"><h3>Precautions</h3><p class="note">${t.precautions.length} ${t.precautions.length === 1 ? 'thing' : 'things'} to keep in mind</p><ul class="prec">${t.precautions.map(x => `<li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(x)}</li>`).join('')}</ul></div>` : ''}</div>`;
   }
   function basicsHTML(t) {
     return `<div class="td-head"><h3>Trip details</h3><p>What shows on the passport.</p></div>
