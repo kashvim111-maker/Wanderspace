@@ -1705,6 +1705,99 @@ body{font-synthesis-weight:none}
 .ckgrid .cklist{width:auto;min-width:0}
 .precard .prec{margin-top:4px}
 @media (max-width:900px){.ckgrid{grid-template-columns:1fr}}
+
+/* ================= phone layout (≤600px) ================= */
+@media (max-width:600px){
+  /* top bar: logo · tabs · round + button, all on one line */
+  .topbar{top:10px;left:10px;right:10px;gap:6px}
+  .brand{padding:3px!important}
+  .brand-name{display:none}
+  .tabs{padding:4px;gap:0;min-width:0}
+  .tab{padding:8px 11px!important;font-size:12.5px!important;white-space:nowrap;line-height:1.1}
+  .tab .count{display:none}
+  #primary{width:42px;height:42px;padding:0!important;border-radius:50%;font-size:0!important;line-height:0!important;display:flex!important;align-items:center;justify-content:center;flex:none}
+  #primary::before{content:"";width:18px;height:18px;background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v16M4 12h16' stroke='black' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v16M4 12h16' stroke='black' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+  .save-state{display:none!important}
+  .topbar.min #primary{color:#fff}
+
+  /* hero */
+  .mhero-in{padding:0 22px}
+  .h-kicker{font-size:10.5px;letter-spacing:.22em}
+  .h-title{font-size:clamp(40px,12.4vw,52px)!important;line-height:1.02!important}
+  .h-sub{font-size:14.5px!important;line-height:1.55!important;max-width:34ch;margin-left:auto;margin-right:auto}
+
+  /* reel: title sits under the top bar, camera fits the screen */
+  .rname{top:72px!important}
+  .rname h2{font-size:clamp(30px,9vw,40px)!important;line-height:1.05}
+  .rname h2 em{font-size:.5em!important}
+  .booth{padding-top:282px!important;width:min(204px,52vw)!important}
+  .booth .slot{transform:scale(.9)}
+  .reel.empty .frame.add{max-width:100%}
+
+  /* dialogs never run off the screen */
+  .modal{padding:12px!important;align-items:flex-start;overflow-y:auto}
+  .dialog{width:100%!important;max-width:calc(100vw - 24px)!important;box-sizing:border-box;padding:22px 18px!important;margin:auto 0}
+  .dialog .row{grid-template-columns:1fr 1fr!important;gap:10px}
+  .dialog .form input,.dialog .form select{min-width:0;width:100%;box-sizing:border-box;font-size:16px}
+  .fd-thumb{gap:12px}
+  .dialog .actions{flex-wrap:wrap}
+  .dialog .actions .btn{flex:1 1 auto;justify-content:center}
+
+  /* upload queue + toasts don't pile on top of each other */
+  .queue{bottom:12px!important}
+  .toast{left:12px!important;right:12px!important;transform:none!important;max-width:none!important;bottom:auto!important;top:66px}
+
+  /* board */
+  .hint{display:none}
+  .zoom{right:10px!important;bottom:12px!important}
+  #seltool{max-width:calc(100vw - 20px)!important;overflow-x:auto;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #seltool button{white-space:nowrap;flex:none}
+  .bempty{padding:0 22px!important;text-align:center}
+  .be-main{max-width:100%}
+
+  /* passport: notes stay readable over the photo */
+  .pb-right{background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(255,255,255,.96) 88%,rgba(255,255,255,.4) 100%)!important}
+  .pb-page{padding:22px 18px!important}
+
+  /* planner */
+  .pl-head{gap:10px!important;padding:14px 14px 0!important}
+  .pl-tabs{width:100%;display:grid!important;grid-template-columns:repeat(3,1fr);overflow:visible!important}
+  .pl-tab{padding:9px 6px!important;font-size:13px!important;text-align:center;justify-content:center}
+  .pl-tab .tl{display:none}
+  .sheet{padding:0!important;background:transparent!important;border:0!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important}
+  .sheet.center-top{padding-top:12px!important}
+  .cklist{padding:20px 18px!important;border-radius:20px}
+  .cklist h3{font-size:30px!important}
+  .ckadd{flex-wrap:wrap;gap:8px}
+  .ckadd input{flex:1 1 100%!important;font-size:16px}
+  .ckadd .btn{flex:1 1 100%;justify-content:center}
+  .addplace{padding:16px!important}
+  .ap-row{grid-template-columns:1fr!important}
+  .ap-row input,.ap-row select{font-size:16px}
+  .pfilter{flex-wrap:nowrap!important;overflow-x:auto;justify-content:flex-start!important;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:4px;max-width:100%}
+  .pfilter button{flex:none}
+  .pgrid2{grid-template-columns:1fr 1fr!important;gap:12px!important}
+
+  /* touch: press feedback instead of hover */
+  button:active,.frame:active,.pcard:active{transform:scale(.97);transition:transform .12s}
+  /* trip gallery header wraps on phones */
+  .tg-head{flex-wrap:wrap;gap:12px;padding-right:44px}
+  .tg-head h3{font-size:34px!important}
+  .tg-acts{width:100%;display:flex;flex-wrap:wrap;gap:8px}
+  .tg-acts .btn{flex:1 1 auto;justify-content:center}
+  /* sticker kit tucks fully away, leaving just its tab */
+  #tray.collapsed{transform:translateX(calc(-100% + 40px))!important}
+  #tray.collapsed>*:not(.tray-head){opacity:0;pointer-events:none}
+  #tray.collapsed .tray-title{opacity:0}
+  #tray{transition:transform .45s var(--ease)}
+  #tray>*{transition:opacity .25s}
+  .tgal .tg-acts .close{position:absolute;top:16px;right:16px}
+  .tgal{position:relative}
+  .pcat-b{max-width:calc(100% - 52px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px!important}
+  .jpager{transform:scale(.86);transform-origin:right center}
+}
 </style>
 </head>
 <body>
@@ -1727,13 +1820,13 @@ body{font-synthesis-weight:none}
   <section class="view" id="view-dream" aria-label="My Travel Visionary">
     <div class="bempty" id="boardEmpty" hidden>
       <div class="be-ghost g1" aria-hidden="true"></div><div class="be-ghost g2" aria-hidden="true"></div><div class="be-ghost g3" aria-hidden="true"></div>
-      <p class="be-kicker">Places I’m going</p>
+      <p class="be-kicker">My travel vision board</p>
       <button class="be-main" id="beAdd" aria-label="Add destination">
         <span class="be-plus"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
-        <b>Add destination</b>
-        <small>Add a photo and the place — we’ll plan the first days, map the route and stamp its passport.</small>
+        <b>Add a place you dream of visiting</b>
+        <small>Pin a photo, name the place, and start manifesting it — we’ll build the itinerary, map the route and stamp its passport.</small>
       </button>
-      <p class="be-hint">or paste / drop a photo anywhere on the board</p>
+      <p class="be-hint">or drop a photo anywhere on the board</p>
     </div>
     <div id="stage"><div id="world"></div></div>
     <aside id="tray" aria-label="Sticker kit">
@@ -1753,12 +1846,12 @@ body{font-synthesis-weight:none}
 
   <section class="view" id="view-mem" aria-label="My Camera Roll" hidden>
     <header class="mhero">
-      <div class="mhero-media" id="heroMedia"><video id="heroVid" autoplay muted loop playsinline preload="auto" poster="img/hero-poster.jpg" aria-label="A traveller walking down a cherry-blossom lane in Japan"><source src="img/hero.mp4" type="video/mp4"></video></div>
+      <div class="mhero-media" id="heroMedia"><video id="heroVid" autoplay muted loop playsinline preload="auto" poster="img/hero-poster.jpg" aria-label="A traveller walking down a cherry-blossom lane"><source src="img/hero.mp4" type="video/mp4"></video></div>
       <div class="mhero-in" id="heroIn">
-        <span class="h-kicker">Memories · Japan</span>
-        <h1 class="h-title"><span class="w" style="--w:0">Save</span> <span class="w" style="--w:1">your</span> <span class="w jp" style="--w:2">Japan</span> <span class="w" style="--w:3">memories</span><br><span class="w" style="--w:4">in</span> <span class="w" style="--w:5">this</span> <span class="w" style="--w:6">reel</span></h1>
-        <p class="h-sub">Cherry-blossom lanes, late trains, the ramen you still think about. Drop in your photos and videos and they become one moving story of your trip.</p>
-        <button class="addbar glass-x" id="addYours" data-glare aria-label="Add your Japan photos and videos">
+        <span class="h-kicker">Memories · Your trips</span>
+        <h1 class="h-title"><span class="w" style="--w:0">Save</span> <span class="w" style="--w:1">your</span> <span class="w jp" style="--w:2">trip</span> <span class="w" style="--w:3">memories</span><br><span class="w" style="--w:4">in</span> <span class="w" style="--w:5">this</span> <span class="w" style="--w:6">camera</span> <span class="w" style="--w:7">reel</span></h1>
+        <p class="h-sub">Cherry-blossom lanes in Kyoto, a sunset shack in Goa, the Paris café you still think about. Bring home the photos and videos you took — each trip prints as its own frame on your reel.</p>
+        <button class="addbar glass-x" id="addYours" data-glare aria-label="Add photos and videos from a trip">
           <span class="ab-plus"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span>
           <span class="ab-txt">Add yours</span>
           <span class="ab-hint">photos · videos · drop or paste</span>

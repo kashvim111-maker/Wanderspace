@@ -189,6 +189,9 @@
   function renderWorld() {
     world.innerHTML = DECOR + S.els.map(elHTML).join('');
     const be = $('#boardEmpty'); if (be) be.hidden = S.els.length > 0;
+    // the first thing pinned to an empty board gets framed so it's fully in view (matters most on phones)
+    if (S.els.length && !renderWorld.had && stage.clientWidth) fitBoard();
+    renderWorld.had = S.els.length > 0;
     positionSeltool();
     renderCounts();
   }
@@ -271,7 +274,7 @@
     const box = $('#seltool'); if (box.hidden || !S.sel) return;
     const n = world.querySelector(`.el[data-id="${S.sel}"]`); if (!n) { box.hidden = true; return; }
     const r = n.getBoundingClientRect();
-    box.style.left = clamp(r.left + r.width / 2, 200, window.innerWidth - 200) + 'px';
+    const hw = Math.min(box.offsetWidth / 2 + 10, window.innerWidth / 2); box.style.left = clamp(r.left + r.width / 2, hw, window.innerWidth - hw) + 'px';
     box.style.top = Math.max(r.top - 58, 112) + 'px';
   }
   $('#seltool').addEventListener('click', ev => {
@@ -474,6 +477,7 @@
   }
   $('#cats').addEventListener('click', ev => { const b = ev.target.closest('.cat'); if (!b) return; S.cat = b.dataset.cat; renderTray(); });
   $('#trayToggle').onclick = () => { const t = $('#tray'); t.classList.toggle('collapsed'); $('#trayToggle').style.transform = t.classList.contains('collapsed') ? 'rotate(180deg)' : ''; };
+  if (window.innerWidth <= 700) { $('#tray').classList.add('collapsed'); $('#trayToggle').style.transform = 'rotate(180deg)'; }
   $('#trayAddDest').onclick = () => openAddDest({});
   $('#beAdd').onclick = () => openAddDest({});
 
@@ -815,7 +819,7 @@
       fillSeason(t);
       return;
     }
-    const tabs = [['route', 'Route & itinerary'], ['places', 'Places to visit'], ['check', 'Checklist']];
+    const tabs = [['route', 'Route<span class="tl"> &amp; itinerary</span>'], ['places', 'Places<span class="tl"> to visit</span>'], ['check', 'Checklist']];
     const has = (t.itinerary || []).length || (t.places || []).length;
     const fresh = !$('.planner');
     const html = `<div class="modal" data-backdrop="1" role="dialog" aria-modal="true" aria-label="Plan ${esc(t.name)}">
@@ -2335,7 +2339,7 @@ Reply with only a JSON array with one object per photo in the same order:
   const vm = $('#view-mem'), veil = $('#dropveil');
   let dragN = 0;
   const isOutsideDrag = ev => { const t = Array.from(ev.dataTransfer?.types || []); return t.includes('Files') || t.includes('text/uri-list') || t.includes('text/html'); };
-  const showVeil = on => { veil.hidden = !on; if (on) $('#dropTxt').textContent = S.folder && S.folder !== 'Unsorted' ? `Drop to add to ${S.folder}` : $('#mbody').hidden ? 'Drop to add to your Japan reel' : 'Drop to sort into your places'; };
+  const showVeil = on => { veil.hidden = !on; if (on) $('#dropTxt').textContent = openTripName() ? `Drop to add to ${openTripName()}` : 'Drop to start a new trip'; };
   vm.addEventListener('dragenter', ev => { if (!isOutsideDrag(ev)) return; ev.preventDefault(); dragN++; showVeil(true); });
   vm.addEventListener('dragover', ev => { if (!isOutsideDrag(ev)) return; ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; });
   vm.addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN) showVeil(false); });
@@ -2523,9 +2527,9 @@ Reply with only a JSON array with one object per photo in the same order:
     $('#reel').classList.toggle('empty', !N);
     if (!N) {
       $('#reel').style.height = '100vh';
-      $('#strip').innerHTML = `<button class="frame add" data-reel="addtrip" aria-label="Add a thumbnail of your recent trip"><span class="ph"><span class="fa-in"><span class="fa-plus"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><b>Add a thumbnail of your recent trip</b><small>Pick the dates, then upload all its photos & videos</small></span></span></button>`;
-      $('#camScreen').innerHTML = '<div class="cs-empty">Your first trip goes here</div>';
-      $('#rname').innerHTML = `<div class="swap-in"><h2>Your trip album<em>start with the most recent one</em></h2></div>`;
+      $('#strip').innerHTML = `<button class="frame add" data-reel="addtrip" aria-label="Add your first trip"><span class="ph"><span class="fa-in"><span class="fa-plus"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><b>Add your first trip</b><small>Name it, pick the dates, then bring in every photo and video you took</small></span></span></button>`;
+      $('#camScreen').innerHTML = '<div class="cs-empty">Your first print develops here</div>';
+      $('#rname').innerHTML = `<div class="swap-in"><h2>Your camera reel is empty<em>start with the trip you just got back from</em></h2></div>`;
       REEL.cur = -1; $('#strip').style.transform = ''; renderReelCal();
       return;
     }
@@ -2825,7 +2829,7 @@ Reply with only a JSON array with one object per photo in the same order:
     const hvid = $('#heroVid'); if (hvid) { if (tab === 'mem') hvid.play().catch(() => {}); else hvid.pause(); }
     requestAnimationFrame(moveTabInd);
     $('.topbar').classList.toggle('min', tab === 'mem' && $('#view-mem').scrollTop < $('.mhero').offsetHeight - 90);
-    $('#primary').textContent = tab === 'dream' ? '+ Destination' : 'Upload memories';
+    $('#primary').textContent = tab === 'dream' ? '+ Destination' : 'Upload memories'; $('#primary').setAttribute('aria-label', tab === 'dream' ? 'Add a destination' : 'Upload memories');
     if (location.hash.slice(1) !== (tab === 'dream' ? 'dream-board' : 'memories')) history.replaceState(null, '', '#' + (tab === 'dream' ? 'dream-board' : 'memories'));
     if (tab === 'mem') { $('#seltool').hidden = true; renderMem(); } else { if (!fitted) fitBoard(); renderSeltool(); positionSeltool(); }
   }
