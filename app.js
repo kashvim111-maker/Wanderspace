@@ -2399,7 +2399,7 @@ Reply with only a JSON array with one object per photo in the same order:
     } else {
       pane = places.size ? `<div class="mc-list">${Array.from(places.values()).map(p => `<button class="mc-row" data-cal="folder" data-key="${esc(p.key)}">${p.img ? `<img src="${esc(p.img)}" alt="">` : ''}<span><b>${esc(p.key)}</b><small>${esc(Array.from(p.cities).slice(0, 3).join(' · ') || '')}${p.cities.size ? ' · ' : ''}${p.n} ${p.n === 1 ? 'memory' : 'memories'}</small></span></button>`).join('')}</div>` : `<div class="mc-empty">No places logged this month.</div>`;
     }
-    const nextM = MONTHS_L[mo % 12];
+    const nextM = MONTHS_L[(new Date().getMonth() + 1) % 12];
     card.innerHTML = `<div class="mc-top"><small>big<br>thanks</small><b>${MONTHS_L[mo - 1]}</b></div>
       <div class="mc-tabs" role="tablist" aria-label="Month view">${['days', 'cal', 'places'].map(k => `<button role="tab" data-cal="tab" data-v="${k}" aria-selected="${S.cal.tab === k}" aria-label="${{ days: 'Day by day', cal: 'Calendar', places: 'Places' }[k]}">${ICAL[k]}</button>`).join('')}<span class="mc-ind" style="transform:translateX(${tIdx * 100}%)"></span></div>
       <div class="mc-head"><button data-cal="prev" aria-label="Previous month with memories" ${prev ? '' : 'disabled'}><svg width="12" height="12" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button><span>${MONTHS_L[mo - 1]} ${y}</span><button data-cal="next" aria-label="Next month with memories" ${next ? '' : 'disabled'}><svg width="12" height="12" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button></div>
@@ -2628,7 +2628,8 @@ Reply with only a JSON array with one object per photo in the same order:
     swapIn($('#calTop'), `<b>hi ${MONTHS_L[mo - 1]}</b><small>${esc(placeTxt)}</small>`, dir);
     swapIn($('#calLbl'), `<span>${MONTHS_L[mo - 1]} ${y}</span>`, dir);
     swapIn($('#calBody'), `<div class="mc-grid">${cells}</div>`, dir);
-    swapIn($('#calFoot'), `<b>say hi to, ${MONTHS_L[mo % 12]}</b>`, dir);
+    // always the month coming up from today, whichever month you're browsing
+    { const up = MONTHS_L[(new Date().getMonth() + 1) % 12], cf = $('#calFoot'); if (cf && cf.dataset.m !== up) { cf.dataset.m = up; cf.innerHTML = `<div class="sw"><b>say hi to, ${up}</b></div>`; } }
     const pv = $('#calPrev'), nx = $('#calNext');
     pv.dataset.v = prev || ''; pv.disabled = !prev; nx.dataset.v = next || ''; nx.disabled = !next;
     /* cross-fade the blurred background */
