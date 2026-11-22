@@ -27,7 +27,7 @@
   /* ---------- state ---------- */
   const S = {
     trips: {}, els: [], mems: {}, prefs: { hideExamples: true },
-    view: { x: 0, y: 0, z: 1 }, sel: null, tab: 'dream', folder: null, city: 'all', queue: [], cat: 'all',
+    view: { x: 0, y: 0, z: 1 }, sel: null, tab: 'mem', folder: null, city: 'all', queue: [], cat: 'all',
   };
   const caps = { db: null, assets: null, sample: null, col: null, ready: false };
   const W = { dirty: {}, writing: {}, again: {}, timers: {} };
@@ -165,7 +165,7 @@
       const st = posterStyle(t), w = e.w || 250, h = Math.round(w * (e.ar || 1.6));
       const name = (t.name || '').toUpperCase(), n = Math.max(name.length, 3);
       const fs = st === 'stencil' ? Math.min(w * .36, (w * 1.3) / n) : st === 'gold' ? Math.min(w * .26, (w * 1.22) / n) : Math.min(w * .2, (w * 1.45) / n);
-      return `<div class="poster ps-${st}" style="width:${w}px;height:${h}px"><div class="art">${cover(t)}</div><span class="pname" style="font-size:${fs.toFixed(1)}px">${esc(name)}</span><span class="pstat st-${t.status}">${t.status}</span></div>`;
+      return `<div class="poster ps-${st} noname" style="width:${w}px;height:${h}px" role="img" aria-label="${esc(t.name || 'Destination')}"><div class="art">${cover(t)}</div></div>`;
     }
     if (e.kind === 'sticker') { const st = ART.ST[e.sticker]; if (!st) return null; return `<div class="stk" style="width:${st.w}px;height:${st.h}px">${st.svg()}</div>`; }
     if (e.kind === 'text') { if (e.font) { loadFont(e.font, e.weight || 400, !!e.italic); return `<div class="txt t-custom" style="${txtStyle(e)}">${esc(e.text)}</div>`; } return `<div class="txt t-${e.style}" style="font-size:${e.size}px">${esc(e.text)}</div>`; }
@@ -2839,7 +2839,7 @@ Reply with only a JSON array with one object per photo in the same order:
   }
   $('#tab-dream').onclick = () => setTab('dream');
   $('#tab-mem').onclick = () => setTab('mem');
-  $('#brand').onclick = () => setTab('dream');
+  $('#brand').onclick = () => { setTab('mem'); $('#view-mem').scrollTo({ top: 0, behavior: 'smooth' }); };
   $('#primary').onclick = () => (S.tab === 'dream' ? openAddDest({}) : pickFiles(S.folder));
   window.addEventListener('hashchange', () => setTab(location.hash === '#memories' ? 'mem' : 'dream'));
   function refreshClaudeUI() { if (IT.mode === 'plan') renderItin(); }
@@ -2896,7 +2896,7 @@ Reply with only a JSON array with one object per photo in the same order:
   renderTray();
   renderWorld();
   requestAnimationFrame(fitBoard);
-  setTab(location.hash === '#memories' ? 'mem' : 'dream');
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; setTab('mem'); $('#view-mem').scrollTop = 0; window.scrollTo(0, 0);
   setSave('idle');
   Promise.resolve(connect()).finally(() => setTimeout(() => askLocation(false), 1400));
 })();
