@@ -1961,22 +1961,14 @@ Reply with only JSON in exactly this shape:
   let upDest = null;
   let PENDING_FILES = null;
   function chooseTrip(files) {
-    const trips = FOLDERS();
-    if (!trips.length) { PENDING_FILES = files; toast('Add the trip first — your photos go straight into it.'); return openFolderDialog(); }
-    if (trips.length === 1) return processFiles(files, trips[0].name);
-    $('#modal').innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Which trip are these from?"><div class="dialog pickdlg">
-      <button class="icon-btn close" data-pick="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="2"/></svg></button>
-      <h3>Which trip are these from?</h3><p class="lead">${files.length} ${files.length === 1 ? 'file' : 'files'} — every photo and video is kept inside a trip.</p>
-      <div class="pick-list">${trips.map(f => `<button class="pick-trip" data-pick="${esc(f.id)}"><b>${esc(f.name)}</b><small>${esc([f.place, f.start ? fmtRange(f.start, f.end) : ''].filter(Boolean).join(' · '))}</small></button>`).join('')}</div>
-      <div class="actions"><button class="btn btn-ghost" data-pick="new">+ New trip</button></div></div></div>`;
-    $('#modal').onclick = ev => {
-      const b = ev.target.closest('[data-pick]'); if (!b) return;
-      $('#modal').onclick = null; const k = b.dataset.pick;
-      if (k === 'close') return closeModal();
-      if (k === 'new') { PENDING_FILES = files; return openFolderDialog(); }
-      const f = folderById(k); closeModal(); if (f) processFiles(files, f.name);
-    };
+    // uploads that don't start inside an open trip always become a new trip on the strip
+    PENDING_FILES = files;
+    openFolderDialog();
+    const first = files.find(f => f.type && f.type.startsWith('image/') && !/heic|heif/i.test(f.type));
+    if (first) { FDT.blob = first; FDT.url = URL.createObjectURL(first); const th = $('.fd-th'); if (th) th.innerHTML = `<img src="${FDT.url}" alt="">`; }
+    const lead = $('.fdlg .lead'); if (lead) lead.textContent = `${files.length} ${files.length === 1 ? 'photo' : 'files'} ready. Name this trip and add its dates — it gets its own photo on your strip.`;
   }
+  const openTripName = () => (REEL.gal && REEL.gal.folder ? REEL.gal.folder.name : null);
   // photos that aren't inside any trip (left over from deleted trips) are removed — no trip, no photos
   async function sweepLoose() {
     const ids = new Set(FOLDERS().map(f => f.id));
@@ -2030,7 +2022,7 @@ Reply with only JSON in exactly this shape:
   }
   $('#modal').addEventListener('click', ev => {
     const b = ev.target.closest('[data-fd]'); if (!b) return;
-    if (b.dataset.fd === 'close') { if (b.classList.contains('modal') && ev.target !== b) return; $('#modal').innerHTML = ''; }
+    if (b.dataset.fd === 'close') { if (b.classList.contains('modal') && ev.target !== b) return; PENDING_FILES = null; $('#modal').innerHTML = ''; }
     if (b.dataset.fd === 'thumb') thumbInput.click();
     if (b.dataset.fd === 'del') {
       const id = $('#fdForm').dataset.edit, fm = folderById(id); if (fm) confirmDeleteTrip(fm);
@@ -2347,15 +2339,15 @@ Reply with only a JSON array with one object per photo in the same order:
   vm.addEventListener('dragenter', ev => { if (!isOutsideDrag(ev)) return; ev.preventDefault(); dragN++; showVeil(true); });
   vm.addEventListener('dragover', ev => { if (!isOutsideDrag(ev)) return; ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; });
   vm.addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN) showVeil(false); });
-  vm.addEventListener('drop', ev => { ev.preventDefault(); dragN = 0; showVeil(false); takeTransfer(ev.dataTransfer, S.folder || ($('#mbody').hidden ? 'Japan' : null)); });
+  vm.addEventListener('drop', ev => { ev.preventDefault(); dragN = 0; showVeil(false); takeTransfer(ev.dataTransfer, openTripName()); });
   document.addEventListener('paste', ev => {
     if (S.tab !== 'mem' || $('#modal').children.length || ev.target.closest?.('input,textarea,[contenteditable]')) return;
     const dt = ev.clipboardData; if (!dt) return;
     const hasFile = Array.from(dt.items || []).some(i => i.kind === 'file') || (dt.files && dt.files.length);
     if (!hasFile && !dt.getData('text/html') && !/^(https?:|data:image)/.test(dt.getData('text/plain') || '')) return;
     ev.preventDefault();
-    if (!hasFile && !dt.getData('text/html')) { fromUrl(dt.getData('text/plain').trim()).then(f => (f ? processFiles([f], S.folder) : toast(OUTSIDE))); return; }
-    takeTransfer(dt, S.folder || ($('#mbody').hidden ? 'Japan' : null));
+    if (!hasFile && !dt.getData('text/html')) { fromUrl(dt.getData('text/plain').trim()).then(f => (f ? processFiles([f], openTripName()) : toast(OUTSIDE))); return; }
+    takeTransfer(dt, openTripName());
   });
 
   /* ---------- month-in-memories calendar ---------- */
@@ -2450,7 +2442,7 @@ Reply with only a JSON array with one object per photo in the same order:
     });
   }, { passive: true });
   const HERO_ONLY = () => $('#mbody').hidden;
-  $('#addYours').onclick = () => openFolderDialog();
+  $('#addYours').onclick = () => { PENDING_FILES = null; openFolderDialog(); };
   $('#newFolder').onclick = () => openFolderDialog();
   const hv = $('#heroVid');
   if (hv) { hv.addEventListener('error', () => {}, true); }
@@ -2840,7 +2832,7 @@ Reply with only a JSON array with one object per photo in the same order:
   $('#tab-dream').onclick = () => setTab('dream');
   $('#tab-mem').onclick = () => setTab('mem');
   $('#brand').onclick = () => { setTab('mem'); $('#view-mem').scrollTo({ top: 0, behavior: 'smooth' }); };
-  $('#primary').onclick = () => (S.tab === 'dream' ? openAddDest({}) : pickFiles(S.folder));
+  $('#primary').onclick = () => (S.tab === 'dream' ? openAddDest({}) : pickFiles(openTripName()));
   window.addEventListener('hashchange', () => setTab(location.hash === '#memories' ? 'mem' : 'dream'));
   function refreshClaudeUI() { if (IT.mode === 'plan') renderItin(); }
 
